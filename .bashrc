@@ -1,69 +1,52 @@
 #!/bin/bash
-iatest=$(expr index "$-" i)
 
-#######################################################
-# SOURCED ALIAS'S AND SCRIPTS BY zachbrowne.me
-#######################################################
+##############
+##  Aliases ##
+##############
+if command -v nvim >/dev/null 2>&1; then
+  alias vim='nvim'
+else
+  alias vim='vim'
+fi
 
-# Source global definitions
+#################
+## Global Prep ##
+#################
 if [ -f /etc/bashrc ]; then
 	 . /etc/bashrc
 fi
 
-# Enable bash programmable completion features in interactive shells
 if [ -f /usr/share/bash-completion/bash_completion ]; then
 	. /usr/share/bash-completion/bash_completion
 elif [ -f /etc/bash_completion ]; then
 	. /etc/bash_completion
 fi
 
-#######################################################
-# EXPORTS
-#######################################################
-
-# Disable the bell
-if [[ $iatest > 0 ]]; then bind "set bell-style visible"; fi
-
-# Expand the history size
+#####################
+## Default Exports ##
+#####################
+interactive=$(expr index "$-" i)
 export HISTFILESIZE=10000
 export HISTSIZE=500
-
-# Don't put duplicate lines in the history and do not add lines that start with a space
 export HISTCONTROL=erasedups:ignoredups:ignorespace
-
-# Check the window size after each command and, if necessary, update the values of LINES and COLUMNS
 shopt -s checkwinsize
-
-# Causes bash to append to history instead of overwriting it so if you start a new terminal, you have old session history
 shopt -s histappend
 PROMPT_COMMAND='history -a'
-
-# Allow ctrl-S for history navigation (with ctrl-R)
 stty -ixon
-
-# Ignore case on auto-completion
-# Note: bind used instead of sticking these in .inputrc
-if [[ $iatest > 0 ]]; then bind "set completion-ignore-case on"; fi
-
-# Show auto-completion list automatically, without double tab
-if [[ $iatest > 0 ]]; then bind "set show-all-if-ambiguous On"; fi
+if [[ $interactive -gt 0 ]]; then bind "set completion-ignore-case on"; fi
+if [[ $interactive -gt 0 ]]; then bind "set show-all-if-ambiguous On"; fi
 
 # Set the default editor
-export EDITOR=vim
-export VISUAL=vim
-alias pico='edit'
-alias spico='sedit'
-alias nano='edit'
-alias snano='sedit'
+export EDITOR=$(command -v nvim >/dev/null 2>&1 && echo nvim || echo vim)
+export VISUAL=$(command -v nvim >/dev/null 2>&1 && echo nvim || echo vim)
 
-# To have colors for ls and all grep commands such as grep, egrep and zgrep
+# Colors for ls and grep* 
 export CLICOLOR=1
 export LS_COLORS='no=00:fi=00:di=00;34:ln=01;36:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.gz=01;31:*.bz2=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.avi=01;35:*.fli=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.ogg=01;35:*.mp3=01;35:*.wav=01;35:*.xml=00;31:'
-#export GREP_OPTIONS='--color=auto' #deprecated
 alias grep="/usr/bin/grep $GREP_OPTIONS"
 unset GREP_OPTIONS
 
-# Color for manpages in less makes manpages a little easier to read
+# Color for manpages in less
 export LESS_TERMCAP_mb=$'\E[01;31m'
 export LESS_TERMCAP_md=$'\E[01;31m'
 export LESS_TERMCAP_me=$'\E[0m'
@@ -72,11 +55,9 @@ export LESS_TERMCAP_so=$'\E[01;44;33m'
 export LESS_TERMCAP_ue=$'\E[0m'
 export LESS_TERMCAP_us=$'\E[01;32m'
 
-#######################################################
-# Set the ultimate amazing command prompt
-#######################################################
-
-alias cpu="grep 'cpu ' /proc/stat | awk '{usage=(\$2+\$4)*100/(\$2+\$4+\$5)} END {print usage}' | awk '{printf(\"%.1f\n\", \$1)}'"
+############
+## Prompt ##
+############
 function __setprompt
 {
 	local LAST_COMMAND=$? # Must come first!
@@ -142,46 +123,48 @@ function __setprompt
 		PS1=""
 	fi
 
-	# Date
-	PS1+="\[${DARKGRAY}\](\[${CYAN}\]\$(date +%a) $(date +%b-'%-m')" # Date
-	PS1+="${BLUE} $(date +'%-I':%M:%S%P)\[${DARKGRAY}\])-" # Time
+	# Date or Venv
+	if [[ -z "${VIRTUAL_ENV}" ]]; then
+		PS1+="\[${CYAN}\] \$(date +%a) $(date +%b-'%-m')" # Date
+		PS1+="${BLUE}  $(date +'%-I':%M:%S%P)\[${DARKGRAY}\] 󰐊 " # Time
+	else
+		PS1+="\[${CYAN}\] `basename $VIRTUAL_ENV`\[${DARKGRAY}\] 󰐊 "
+	fi
 
-	# User and server
+	# Username
 	local SSH_IP=`echo $SSH_CLIENT | awk '{ print $1 }'`
 	local SSH2_IP=`echo $SSH2_CLIENT | awk '{ print $1 }'`
 	if [ $SSH2_IP ] || [ $SSH_IP ] ; then
-		PS1+="(\[${RED}\]\u@\h"
+		PS1+="\[${RED}\] \u@\h "
 	else
-		PS1+="(\[${RED}\]\u"
-	fi
+		PS1+="\[${RED}\] \u "
+	fi	
 
 	# Current directory
-	PS1+="\[${DARKGRAY}\]:\[${BROWN}\]\w\[${DARKGRAY}\])-"
+	PS1+="\[${BROWN}\] \w\[${DARKGRAY}\] 󰐊 "
 
-	# Total size of files in current directory
-	PS1+="(\[${GREEN}\]$(/bin/ls -lah | /bin/grep -m 1 total | /bin/sed 's/total //')\[${DARKGRAY}\]:"
-
-	# Number of files
-	PS1+="\[${GREEN}\]\$(/bin/ls -A -1 | /usr/bin/wc -l)\[${DARKGRAY}\])"
-
-	# Skip to the next line
-	PS1+="\n"
+	if git rev-parse --abbrev-ref HEAD >/dev/null 2>&1; then
+		# Git info
+		PS1+="\[${GREEN}\]󰊢 $(basename $(git rev-parse --show-toplevel)) "
+		PS1+="\[${YELLOW}\] $(git rev-parse --abbrev-ref HEAD)\[${DARKGRAY}\]"
+	else
+		# File info
+		PS1+="\[${GREEN}\] $(/bin/ls -lah | /bin/grep -m 1 total | /bin/sed 's/total //') "
+		PS1+="\[${GREEN}\] \$(/bin/ls -A -1 | /usr/bin/wc -l)\[${DARKGRAY}\]"
+	fi	
 
 	if [[ $EUID -ne 0 ]]; then
-		PS1+="\[${GREEN}\]  ╚══╣\[${NOCOLOR}\] " # Normal user
+		PS1+="\n\[${GREEN}\]  󰒊\[${NOCOLOR}\] " # Normal user
 	else
-		PS1+="\[${RED}\]  ╚══╣\[${NOCOLOR}\] " # Root user
+		PS1+="\n\[${RED}\]  󰒊\[${NOCOLOR}\] " # Root user
 	fi
 
 	# PS2 is used to continue a command using the \ character
 	PS2="\[${DARKGRAY}\]>\[${NOCOLOR}\] "
-
-	# PS3 is used to enter a number choice in a script
 	PS3='Please enter a number from above list: '
-
-	# PS4 is used for tracing a script in debug mode
 	PS4='\[${DARKGRAY}\]+\[${NOCOLOR}\] '
 }
+
 PROMPT_COMMAND='__setprompt'
 
 # If not running interactively, don't do anything
@@ -190,79 +173,3 @@ case $- in
 	*) return ;;
 esac
 
-# Path to the bash it configuration
-export BASH_IT="/home/matt/.bash_it"
-
-# Lock and Load a custom theme file.
-# Leave empty to disable theming.
-# location "$BASH_IT"/themes/
-export BASH_IT_THEME='bobby'
-
-# Some themes can show whether `sudo` has a current token or not.
-# Set `$THEME_CHECK_SUDO` to `true` to check every prompt:
-#THEME_CHECK_SUDO='true'
-
-# (Advanced): Change this to the name of your remote repo if you
-# cloned bash-it with a remote other than origin such as `bash-it`.
-# export BASH_IT_REMOTE='bash-it'
-
-# (Advanced): Change this to the name of the main development branch if
-# you renamed it or if it was changed for some reason
-# export BASH_IT_DEVELOPMENT_BRANCH='master'
-
-# Your place for hosting Git repos. I use this for private repos.
-export GIT_HOSTING='git@git.domain.com'
-
-# Don't check mail when opening terminal.
-unset MAILCHECK
-
-# Change this to your console based IRC client of choice.
-export IRC_CLIENT='irssi'
-
-# Set this to the command you use for todo.txt-cli
-export TODO="t"
-
-# Set this to the location of your work or project folders
-#BASH_IT_PROJECT_PATHS="${HOME}/Projects:/Volumes/work/src"
-
-# Set this to false to turn off version control status checking within the prompt for all themes
-export SCM_CHECK=true
-# Set to actual location of gitstatus directory if installed
-#export SCM_GIT_GITSTATUS_DIR="$HOME/gitstatus"
-# per default gitstatus uses 2 times as many threads as CPU cores, you can change this here if you must
-#export GITSTATUS_NUM_THREADS=8
-
-# Set Xterm/screen/Tmux title with only a short hostname.
-# Uncomment this (or set SHORT_HOSTNAME to something else),
-# Will otherwise fall back on $HOSTNAME.
-#export SHORT_HOSTNAME=$(hostname -s)
-
-# Set Xterm/screen/Tmux title with only a short username.
-# Uncomment this (or set SHORT_USER to something else),
-# Will otherwise fall back on $USER.
-#export SHORT_USER=${USER:0:8}
-
-# If your theme use command duration, uncomment this to
-# enable display of last command duration.
-#export BASH_IT_COMMAND_DURATION=true
-# You can choose the minimum time in seconds before
-# command duration is displayed.
-#export COMMAND_DURATION_MIN_SECONDS=1
-
-# Set Xterm/screen/Tmux title with shortened command and directory.
-# Uncomment this to set.
-#export SHORT_TERM_LINE=true
-
-# Set vcprompt executable path for scm advance info in prompt (demula theme)
-# https://github.com/djl/vcprompt
-#export VCPROMPT_EXECUTABLE=~/.vcprompt/bin/vcprompt
-
-# (Advanced): Uncomment this to make Bash-it reload itself automatically
-# after enabling or disabling aliases, plugins, and completions.
-# export BASH_IT_AUTOMATIC_RELOAD_AFTER_CONFIG_CHANGE=1
-
-# Uncomment this to make Bash-it create alias reload.
-# export BASH_IT_RELOAD_LEGACY=1
-
-# Load Bash It
-#source "$BASH_IT"/bash_it.sh

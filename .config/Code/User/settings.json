@@ -1,0 +1,12 @@
+{
+    "workbench.colorTheme": "Dark Orange Default",
+    "git.autofetch": true,
+    "workbench.enableExperiments": false,
+    "workbench.editorAssociations": {
+        "*.pdf": "default"
+    },
+    "workbench.sideBar.location": "right",
+    "extensions.experimental.affinity": {
+        "asvetliakov.vscode-neovim": 1
+    }
+}
