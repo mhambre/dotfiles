@@ -1,0 +1,6 @@
+ripgrep
+fd
+fzf
+net-tools
+tabby-terminal
+tmux
