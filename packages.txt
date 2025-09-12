@@ -1,7 +1,10 @@
 git
 bat
+fd-find
 ripgrep
 fzf
 net-tools
 tabby-terminal
 tmux
+lua5.4
+luarocks
