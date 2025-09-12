@@ -9,40 +9,53 @@ NODE_VERSION="v24.7.0"
 
 # Helpers 
 link_bak () { # Link with backup ($1: Target, $2: Replacement)
+    # Remove old backup
+	if [[ -L $1.bak || -f $1.bak || -d $1.bak ]]; then
+        rm -rf $1.bak
+    fi
+
 	if [[ -L $1 || -f $1 ||  -d $1 ]]; then
+		echo " > Backing up $1 to $1.bak"
 		sudo mv -f $1 $1.bak
 	fi
 
-	echo "Linking $SCRIPT_DIR/$2 -> $1"
+	echo " > Linking $SCRIPT_DIR/$2 -> $1"
 	ln -s $SCRIPT_DIR/$2 $1
 }
 
 bak () { # Move file to backup ($1: Target)
+    # Remove old backup
+	if [[ -L $1.bak || -f $1.bak || -d $1.bak ]]; then
+        rm -rf $1.bak
+    fi
+
 	if [[ -L $1 || -f $1 || -d $1 ]]; then
-		echo "Backing up $1 to $1.bak"
+		echo " > Backing up $1 to $1.bak"
 		sudo mv -f $1 $1.bak
 	fi
 }
 
 # Actions
 ## Install APT Packages
-pkg_install () {
+install_packages () {
 	if [ ! -f /etc/debian_version ]; then
-		2>& echo "Package manager expects a Debian-based distribution!"
-		2>& echo "Install the packages from $SCRIPT_DIR/.packages using your package manager."
+		>&2 echo "Package manager expects a Debian-based distribution!"
+		>&2 echo "Install the packages from $SCRIPT_DIR/.packages using your package manager."
 		exit 1
 	fi
 
-	echo "Installing packages required by dotfiles"
-	sudo apt update -y
-	sudo apt install -y $(cat $SCRIPT_DIR/packages.txt)
+	echo "Installing System Packages..."
+	sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y 2>&1 >/dev/null
+	sudo apt -o Apt::Cmd::Disable-Script-Warning=true install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
 }
 
 ## Install Neovim
-nvim_install () {
-	curl -LO https://github.com/neovim/neovim/releases/download/$NEOVIM_VERSION/$NEOVIM_PKG.tar.gz
+install_nvim () {
+    echo "Installing NeoVim..."
+
+	curl -s -LO https://github.com/neovim/neovim/releases/download/$NEOVIM_VERSION/$NEOVIM_PKG.tar.gz 2>&1 >/dev/null
 	bak /opt/$NEOVIM_PKG
-	sudo tar -C /opt -xzf $NEOVIM_PKG.tar.gz
+	sudo tar -C /opt -xzf $NEOVIM_PKG.tar.gz 2>&1 >/dev/null
 	sudo rm -f $NEOVIM_PKG.tar.gz
 	bak /usr/bin/nvim
     bak /usr/bin/vim
@@ -52,23 +65,25 @@ nvim_install () {
 	sudo ln -s /opt/$NEOVIM_PKG/bin/nvim /usr/bin/vi
 
 	sudo rm -rf $SCRIPT_DIR/.config/nvim/lazy
-	git clone --filter=blob:none https://github.com/folke/lazy.nvim.git $SCRIPT_DIR/.config/nvim/lazy/lazy.nvim
+	git clone --quiet --filter=blob:none https://github.com/folke/lazy.nvim.git $SCRIPT_DIR/.config/nvim/lazy/lazy.nvim >/dev/null 2>&1 || { >&2 echo "Couldn't install Lazy.nvim"; exit 1; }
 }
 
 ## Install Node and Required Packages
 install_node () {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh | bash
+    echo "Installing Node.JS..."
+    curl -s -o- https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh | bash 2>&1 >/dev/null
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" 
-    nvm install $NODE_VERSION
-    nvm use $NODE_VERSION
-    npm install -g pyright
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>&1 >/dev/null # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" 2>&1 >/dev/null
+    nvm install $NODE_VERSION >/dev/null 2>&1 || { echo "Couldn't install Node.JS!"; exit 1; }
+    nvm use $NODE_VERSION 2>&1 >/dev/null
+    npm install -g pyright 2>&1 >/dev/null
 }
 
 
 ## Link Configurations in Home
-link_configs () {
+install_configs () {
+    echo "Adding Custom Dotfiles..."
     configs=(
         .tmux.conf
         .bashrc
@@ -81,8 +96,39 @@ link_configs () {
     done
 }
 
-pkg_install
-nvim_install
-link_configs
-install_node
+## System Configurations
+config_system () {
+    echo "Running Global System Configurations..."
+    echo "setxkbmap -option caps:none" >> ~/.profile
+}
 
+cat <<EOF
+┳┳┓    ╹   ┓ •        ┏┓    ┏•             
+┃┃┃┏┓╋╋ ┏  ┃ ┓┏┓┓┏┓┏  ┃ ┏┓┏┓╋┓┏┓┓┏┏┓┏┓╋┏┓┏┓
+┛ ┗┗┻┗┗ ┛  ┗┛┗┛┗┗┻┛┗  ┗┛┗┛┛┗┛┗┗┫┗┻┛ ┗┻┗┗┛┛ 
+EOF
+
+while true; do
+    cat <<EOF
+This script needs to be run after a fresh system install.
+File's may be manually used and added if the install isn't
+fresh, or in order to apply patches.
+EOF
+
+    read -p "Do you want to proceed? (y/n) " yn
+    case $yn in
+        [Yy]* ) 
+            break;;
+        [Nn]* ) 
+            echo "Exiting..."
+            exit;;
+        * ) 
+            echo "Invalid response. Please answer y or n.";;
+    esac
+done
+
+install_packages &&
+install_nvim &&
+install_configs &&
+install_node &&
+config_system
