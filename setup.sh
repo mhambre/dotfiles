@@ -1,11 +1,9 @@
 #!/bin/bash
 
+
 # Globals
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-NEOVIM_VERSION="v0.11.4"
-NEOVIM_PKG="nvim-linux-x86_64"
-NVM_VERSION="v0.39.1"
-NODE_VERSION="v24.7.0"
+. $SCRIPT_DIR/.env >/dev/null 2>&1 || { >&2 echo "Missing environment file!"; exit 1; }
 
 # Helpers 
 link_bak () { # Link with backup ($1: Target, $2: Replacement)
