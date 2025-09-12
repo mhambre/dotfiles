@@ -78,6 +78,15 @@ install_node () {
     npm install -g pyright 2>&1 >/dev/null
 }
 
+## Install LazyGit
+install_lazygit () {
+    echo "Installing LazyGit..."
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | \grep -Po '"tag_name": *"v\K[^"]*')
+    curl -s -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    tar xf lazygit.tar.gz lazygit 2>&1 >/dev/null
+    sudo install lazygit -D -t /usr/local/bin/ 2>&1 >/dev/null
+    rm -rf lazygit.tar.gz lazygit
+}
 
 ## Link Configurations in Home
 install_configs () {
@@ -97,7 +106,7 @@ install_configs () {
 ## System Configurations
 config_system () {
     echo "Running Global System Configurations..."
-    echo "setxkbmap -option caps:none" >> ~/.profile
+    echo "setxkbmap -option caps:none" >> ~/.profile # No caps
 }
 
 cat <<EOF
@@ -129,4 +138,5 @@ install_packages &&
 install_nvim &&
 install_configs &&
 install_node &&
+install_lazygit &&
 config_system
