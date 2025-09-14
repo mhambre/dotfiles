@@ -61,9 +61,6 @@ install_nvim () {
 	sudo ln -s /opt/$NEOVIM_PKG/bin/nvim /usr/bin/vim
 	sudo ln -s /opt/$NEOVIM_PKG/bin/nvim /usr/bin/nvim
 	sudo ln -s /opt/$NEOVIM_PKG/bin/nvim /usr/bin/vi
-
-	sudo rm -rf $SCRIPT_DIR/.config/nvim/lazy
-	git clone --quiet --filter=blob:none https://github.com/folke/lazy.nvim.git $SCRIPT_DIR/.config/nvim/lazy/lazy.nvim >/dev/null 2>&1 || { >&2 echo "Couldn't install Lazy.nvim"; exit 1; }
 }
 
 ## Install Node and Required Packages

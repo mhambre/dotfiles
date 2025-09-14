@@ -2,32 +2,21 @@
 ---- NeoVim Configuration ----
 ------------------------------
 
--- Global Variables
---- Theme
-vim.opt.termguicolors = true
-vim.cmd [[
-  hi Normal ctermbg=none guibg=none
-  hi NormalNC ctermbg=none guibg=none
-  hi SignColumn ctermbg=none guibg=none
-  hi EndOfBuffer ctermbg=none guibg=none
-]]
-
---- Line Numbers
-vim.wo.number = true
-vim.wo.relativenumber = true
-
---- Spacing
-vim.opt.tabstop = 4
-vim.opt.shiftwidth = 4
-vim.opt.expandtab = true
+-- Requirements
+require("matthambrecht.core")
 
 -- Plugins
-vim.opt.rtp:prepend("~/.config/nvim/lazy/lazy.nvim")
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"  -- ~/.local/share/nvim/lazy/lazy.nvim
+if not vim.loop.fs_stat(lazypath) then
+  vim.fn.system({
+    "git", "clone", "--filter=blob:none",
+    "https://github.com/folke/lazy.nvim.git", "--branch=stable", lazypath,
+  })
+end
+vim.opt.rtp:prepend(lazypath)
 
-require("lazy").setup("plugins")
-
--- Keybinds
-vim.keymap.set({ "n", "v" }, "<A-f>", "<cmd>Telescope find_files<CR>")
-vim.keymap.set({ "n", "v" }, "<A-b>", "<cmd>Neotree<CR>")
-vim.keymap.set({ "n", "v" }, "<A-g>", "<cmd>LazyGit<CR>")
+require("lazy").setup({
+    {import="matthambrecht.plugins"},
+    {import="matthambrecht.plugins.lsp"},
+})
 
