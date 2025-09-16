@@ -44,16 +44,16 @@ return {
         keymap.set("n", "gr", vim.lsp.buf.rename, opts) -- smart rename
 
         opts.desc = "Show buffer diagnostics"
-        keymap.set("n", "\\gD", "<cmd>Telescope diagnostics bufnr=0<CR>", opts) -- show  diagnostics for file
+        keymap.set("n", "gH", "<cmd>Telescope diagnostics bufnr=0<CR>", opts) -- show  diagnostics for file
 
         opts.desc = "Show line diagnostics"
-        keymap.set("n", "\\gd", vim.diagnostic.open_float, opts) -- show diagnostics for line
+        keymap.set("n", "gh", vim.diagnostic.open_float, opts) -- show diagnostics for line
 
         opts.desc = "Go to previous diagnostic"
-        keymap.set("n", "[d", vim.diagnostic.goto_prev, opts) -- jump to previous diagnostic in buffer
+        keymap.set("n", "g[h", vim.diagnostic.goto_prev, opts) -- jump to previous diagnostic in buffer
 
         opts.desc = "Go to next diagnostic"
-        keymap.set("n", "]d", vim.diagnostic.goto_next, opts) -- jump to next diagnostic in buffer
+        keymap.set("n", "g]h", vim.diagnostic.goto_next, opts) -- jump to next diagnostic in buffer
 
         opts.desc = "Restart LSP"
         keymap.set("n", "<leader>rs", ":LspRestart<CR>", opts) -- mapping to restart lsp if necessary
@@ -79,7 +79,6 @@ return {
     })
 
     -- Web Development
-
     vim.lsp.config("svelte", {
       on_attach = function(client, bufnr)
         vim.api.nvim_create_autocmd("BufWritePost", {

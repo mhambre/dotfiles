@@ -166,10 +166,10 @@ function __setprompt
 }
 
 PROMPT_COMMAND='__setprompt'
+neofetch
 
 # If not running interactively, don't do anything
 case $- in
 	*i*) ;;
 	*) return ;;
 esac
-
