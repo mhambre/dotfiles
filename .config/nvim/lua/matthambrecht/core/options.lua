@@ -1,12 +1,7 @@
 -- Global Options
 --- Theme
 vim.opt.termguicolors = true
-vim.cmd([[
-  hi Normal ctermbg=none guibg=none
-  hi NormalNC ctermbg=none guibg=none
-  hi SignColumn ctermbg=none guibg=none
-  hi EndOfBuffer ctermbg=none guibg=none
-]])
+vim.cmd.colorscheme("theme")
 
 --- Line Numbers
 vim.wo.number = true
