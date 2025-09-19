@@ -36,11 +36,18 @@ bak () { # Move file to backup ($1: Target)
 # Actions
 ## Install APT Packages
 install_packages () {
-	if [ ! -f /etc/debian_version ]; then
-		>&2 echo "Package manager expects a Debian-based distribution!"
-		>&2 echo "Install the packages from $SCRIPT_DIR/.packages using your package manager."
+	if [ -f /etc/debian_version ]; then
+        sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y 2>&1 >/dev/null
+        sudo apt -o Apt::Cmd::Disable-Script-Warning=true install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
+    elif [ -f fedora-release ]; then
+        sudo dnf update -y 2>&1 >/dev/null
+        sudo dnf install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
+    else
+    	>&2 echo "Package manager expects a Debian/Fedora-based distribution!"
+		>&2 echo "Install the packages from $SCRIPT_DIR/packages.txt using your package manager."
 		exit 1
 	fi
+
 
 	echo "Installing System Packages..."
 	sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y 2>&1 >/dev/null
