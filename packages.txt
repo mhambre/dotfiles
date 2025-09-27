@@ -10,4 +10,3 @@ tmux
 lua5.4
 luarocks
 black
-neofetch

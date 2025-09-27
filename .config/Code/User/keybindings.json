@@ -1,6 +1,7 @@
 // Place your key bindings in this file to override the defaults
 [
-    {
+    // Tool Panel Openers
+    { // Find-It-Faster
         "key": "alt+f",
         "command": "find-it-faster.findFiles"
     },
@@ -8,14 +9,27 @@
         "key": "ctrl+shift+j",
         "command": "-find-it-faster.findFiles"
     },
-    {
+    { // Terminal
         "key": "alt+j",
-        "command": "workbench.action.togglePanel"
+        "command": "workbench.action.terminal.toggleTerminal"
+    },
+    { // Git
+        "key": "alt+g",
+        "command": "workbench.view.scm"
     },
     {
-        "key": "ctrl+j",
-        "command": "-workbench.action.togglePanel"
+        "key": "q",
+        "command": "workbench.action.closePanel",
+        "when": "panelVisible && vim.mode == 'Normal'"
     },
+    {
+        "key": "q",
+        "command": "workbench.action.closeSidebar",
+        "when": "sideBarVisible && vim.mode == 'Normal'"
+    },
+
+
+    // Sidebar Control
     {
         "key": "alt+b",
         "command": "workbench.action.toggleSidebarVisibility"
@@ -24,14 +38,30 @@
         "key": "ctrl+b",
         "command": "-workbench.action.toggleSidebarVisibility"
     },
-    {
-        "key": "alt+d",
-        "command": "editor.action.revealDefinition",
-        "when": "editorHasDefinitionProvider && editorTextFocus"
+
+    // Vim-style window navigation
+    { // Ctrl+W+%
+        "key": "ctrl+w shift+5",
+        "command": "workbench.action.splitEditorRight"
+    },
+    { // Crtl+W+"
+        "key": "ctrl+w shift+'",         
+        "command": "workbench.action.splitEditorDown"  
     },
     {
-        "key": "f12",
-        "command": "-editor.action.revealDefinition",
-        "when": "editorHasDefinitionProvider && editorTextFocus"
+        "key": "ctrl+w h",
+        "command": "workbench.action.focusLeftGroup"
+    },
+    {
+        "key": "ctrl+w l",
+        "command": "workbench.action.focusRightGroup"
+    },
+    {
+        "key": "ctrl+w k",
+        "command": "workbench.action.focusAboveGroup"
+    },
+    {
+        "key": "ctrl+w j",
+        "command": "workbench.action.focusBelowGroup"
     }
 ]

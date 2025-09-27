@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Globals
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 . $SCRIPT_DIR/.env >/dev/null 2>&1 || { >&2 echo "Missing environment file!"; exit 1; }
@@ -13,7 +12,6 @@ link_bak () { # Link with backup ($1: Target, $2: Replacement)
     fi
 
 	if [[ -L $1 || -f $1 ||  -d $1 ]]; then
-		echo " > Backing up $1 to $1.bak"
 		sudo mv -f $1 $1.bak
 	fi
 
@@ -28,7 +26,6 @@ bak () { # Move file to backup ($1: Target)
     fi
 
 	if [[ -L $1 || -f $1 || -d $1 ]]; then
-		echo " > Backing up $1 to $1.bak"
 		sudo mv -f $1 $1.bak
 	fi
 }
@@ -37,30 +34,23 @@ bak () { # Move file to backup ($1: Target)
 ## Install APT Packages
 install_packages () {
 	if [ -f /etc/debian_version ]; then
-        sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y 2>&1 >/dev/null
-        sudo apt -o Apt::Cmd::Disable-Script-Warning=true install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
-    elif [ -f fedora-release ]; then
-        sudo dnf update -y 2>&1 >/dev/null
-        sudo dnf install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
+        sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y
+        sudo apt -o Apt::Cmd::Disable-Script-Warning=true install -y $(cat $SCRIPT_DIR/packages.txt)
+    elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
+        sudo dnf update -y
+        sudo dnf install -y $(cat $SCRIPT_DIR/packages.txt)
     else
     	>&2 echo "Package manager expects a Debian/Fedora-based distribution!"
-		>&2 echo "Install the packages from $SCRIPT_DIR/packages.txt using your package manager."
+		>&2 echo "Install the packages from ${SCRIPT_DIR}/packages.txt using your package manager."
 		exit 1
 	fi
-
-
-	echo "Installing System Packages..."
-	sudo apt -o Apt::Cmd::Disable-Script-Warning=true update -y 2>&1 >/dev/null
-	sudo apt -o Apt::Cmd::Disable-Script-Warning=true install -y $(cat $SCRIPT_DIR/packages.txt) 2>&1 >/dev/null
 }
 
 ## Install Neovim
 install_nvim () {
-    echo "Installing NeoVim..."
-
-	curl -s -LO https://github.com/neovim/neovim/releases/download/$NEOVIM_VERSION/$NEOVIM_PKG.tar.gz 2>&1 >/dev/null
+	curl -LO https://github.com/neovim/neovim/releases/download/$NEOVIM_VERSION/$NEOVIM_PKG.tar.gz
 	bak /opt/$NEOVIM_PKG
-	sudo tar -C /opt -xzf $NEOVIM_PKG.tar.gz 2>&1 >/dev/null
+	sudo tar -C /opt -xzf $NEOVIM_PKG.tar.gz
 	sudo rm -f $NEOVIM_PKG.tar.gz
 	bak /usr/bin/nvim
     bak /usr/bin/vim
@@ -72,34 +62,58 @@ install_nvim () {
 
 ## Install Node and Required Packages
 install_node () {
-    echo "Installing Node.JS..."
-    curl -s -o- https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh | bash 2>&1 >/dev/null
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" 2>&1 >/dev/null # This loads nvm
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" 2>&1 >/dev/null
-    nvm install $NODE_VERSION >/dev/null 2>&1 || { echo "Couldn't install Node.JS!"; exit 1; }
-    nvm use $NODE_VERSION 2>&1 >/dev/null
-    npm install -g pyright 2>&1 >/dev/null
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    nvm install $NODE_VERSION || { echo "Couldn't install Node.JS!"; exit 1; }
+    nvm use $NODE_VERSION
+    npm install -g pyright
 }
 
 ## Install LazyGit
 install_lazygit () {
-    echo "Installing LazyGit..."
     LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | \grep -Po '"tag_name": *"v\K[^"]*')
-    curl -s -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
-    tar xf lazygit.tar.gz lazygit 2>&1 >/dev/null
-    sudo install lazygit -D -t /usr/local/bin/ 2>&1 >/dev/null
+    curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    tar xf lazygit.tar.gz lazygit
+    sudo install lazygit -D -t /usr/local/bin/
     rm -rf lazygit.tar.gz lazygit
+}
+
+## Install VSCode
+install_vscode () {
+    if [ -f /etc/debian_version ]; then
+        sudo apt-get update
+        sudo apt-get install -y wget gpg
+        wget -O- https://packages.microsoft.com/keys/microsoft.asc \
+          | gpg --dearmor \
+          | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg
+        echo "deb [arch=amd64] https://packages.microsoft.com/repos/code stable main" \
+          | sudo tee /etc/apt/sources.list.d/vscode.list
+        sudo apt-get update
+        sudo apt-get install -y code
+    elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
+        sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+        sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+        sudo dnf check-update || true
+        sudo dnf install -y code
+    else
+        >&2 echo "VSCode installer requires a Debian/Fedora-based distribution!"
+        exit 1
+    fi
+
+    cat "${SCRIPT_DIR}/.config/Code/extensions.txt" | xargs -n 2 code --install-extension
 }
 
 ## Link Configurations in Home
 install_configs () {
-    echo "Adding Custom Dotfiles..."
     configs=(
         .tmux.conf
         .bashrc
         .config/nvim
         .config/tabby
+        .config/Code/User/settings.json
+        .config/Code/User/keybindings.json
     )
 
     for i in "${configs[@]}"; do
@@ -107,10 +121,16 @@ install_configs () {
     done
 }
 
+## Configure fonts
+configure_fonts () {
+    sudo cp "${SCRIPT_DIR}/.local/share/fonts/*" /usr/local/share/fonts
+    fc-cache -fv
+}
+
 ## System Configurations
 config_system () {
-    echo "Running Global System Configurations..."
     echo "setxkbmap -option caps:none" >> ~/.profile # No caps
+    gsettings set org.gnome.desktop.input-sources xkb-options "['caps:none']"
 }
 
 cat <<EOF
@@ -141,6 +161,8 @@ done
 install_packages &&
 install_nvim &&
 install_configs &&
+configure_fonts &&
+install_vscode &&
 install_node &&
 install_lazygit &&
 config_system

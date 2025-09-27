@@ -1,3 +1,2 @@
-.config/tabby/sentry
-.config/tabby/Local\ Storage
 .config/nvim/lazy/*
+.config/tabby/*

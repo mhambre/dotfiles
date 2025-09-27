@@ -233,5 +233,3 @@ profileDefaults:
   ssh:
     disableDynamicTitle: true
 profileBlacklist: []
-
-

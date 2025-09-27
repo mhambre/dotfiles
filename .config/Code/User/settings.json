@@ -1,12 +1,69 @@
 {
     "workbench.colorTheme": "Dark Orange Default",
     "git.autofetch": true,
+    "editor.fontFamily": "'CommitMono Nerd Font Mono', 'monospace'",
+    "terminal.integrated.fontFamily": "'CommitMono Nerd Font Mono'",
+    "debug.console.fontFamily": "'CommitMono Nerd Font Mono'",
+    "markdown.preview.fontFamily": "'CommitMono Nerd Font Mono'",
     "workbench.enableExperiments": false,
     "workbench.editorAssociations": {
         "*.pdf": "default"
     },
     "workbench.sideBar.location": "right",
-    "extensions.experimental.affinity": {
-        "asvetliakov.vscode-neovim": 1
-    }
+    "vim.normalModeKeyBindingsNonRecursive": [
+        // LSP Config
+        {
+            "before": ["g", "R"],
+            "commands": ["editor.action.referenceSearch.trigger"]
+        },
+        {
+            "before": ["g", "D"],
+            "commands": ["editor.action.goToDeclaration"]
+        },
+        {
+            "before": ["g", "d"],
+            "commands": ["editor.action.goToDefinition"]
+        },
+        {
+            "before": ["g", "t"],
+            "commands": ["editor.action.goToTypeDefinition"]
+        },
+        {
+            "before": ["g", "K"],
+            "commands": ["editor.action.showHover"]
+        },
+        {
+            "before": ["g", "r"],
+            "commands": ["editor.action.rename"]
+        },
+        {
+            "before": ["g", "h"],
+            "commands": ["editor.action.showHover"]
+        },
+        // Plugin Config
+        {
+            "before": ["<Space>", "f", "f"],
+            "commands": ["find-it-faster.findFiles"]
+        },
+        {
+            "before": ["<Space>", "f", "w"],
+            "commands": ["find-it-faster.findWithinFiles"]
+        },
+        {
+            "before": ["<Space>", "j"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+        {
+            "before": ["<Space>", "b"],
+            "commands": ["workbench.action.toggleSidebarVisibility"]
+        },
+        {
+            "before": ["<Space>", "g"],
+            "commands": ["workbench.view.scm"]
+        },
+        {
+            "before": ["g", "h"],
+            "commands": ["editor.action.showHover"]
+        },
+    ]
 }
