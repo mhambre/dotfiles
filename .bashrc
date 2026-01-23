@@ -1,14 +1,5 @@
 #!/bin/bash
 
-##############
-##  Aliases ##
-##############
-if command -v nvim >/dev/null 2>&1; then
-  alias vim='nvim'
-else
-  alias vim='vim'
-fi
-
 #################
 ## Global Prep ##
 #################
@@ -173,6 +164,10 @@ case $- in
 	*) return ;;
 esac
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# Loads individual ~/.bashrc.d files
+if [ -d ~/.bashrc.d ]; then
+    for file in ~/.bashrc.d/*.sh; do
+        [ -r "$file" ] && . "$file"
+    done
+    unset file
+fi
