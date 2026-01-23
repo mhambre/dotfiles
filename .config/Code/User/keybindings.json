@@ -17,17 +17,10 @@
         "key": "alt+g",
         "command": "workbench.view.scm"
     },
-    {
-        "key": "q",
-        "command": "workbench.action.closePanel",
-        "when": "panelVisible && vim.mode == 'Normal'"
+    { // Close Active Editor
+        "key": "alt+w",
+        "command": "workbench.action.closeActiveEditor"
     },
-    {
-        "key": "q",
-        "command": "workbench.action.closeSidebar",
-        "when": "sideBarVisible && vim.mode == 'Normal'"
-    },
-
 
     // Sidebar Control
     {
@@ -37,31 +30,5 @@
     {
         "key": "ctrl+b",
         "command": "-workbench.action.toggleSidebarVisibility"
-    },
-
-    // Vim-style window navigation
-    { // Ctrl+W+%
-        "key": "ctrl+w shift+5",
-        "command": "workbench.action.splitEditorRight"
-    },
-    { // Crtl+W+"
-        "key": "ctrl+w shift+'",         
-        "command": "workbench.action.splitEditorDown"  
-    },
-    {
-        "key": "ctrl+w h",
-        "command": "workbench.action.focusLeftGroup"
-    },
-    {
-        "key": "ctrl+w l",
-        "command": "workbench.action.focusRightGroup"
-    },
-    {
-        "key": "ctrl+w k",
-        "command": "workbench.action.focusAboveGroup"
-    },
-    {
-        "key": "ctrl+w j",
-        "command": "workbench.action.focusBelowGroup"
     }
 ]

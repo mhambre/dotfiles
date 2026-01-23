@@ -17,16 +17,32 @@
             "commands": ["editor.action.referenceSearch.trigger"]
         },
         {
+            "before": ["g", "d"],
+            "commands": ["editor.action.showDefinition"]
+        },
+        {
+            "before": ["g", "p", "d"],
+            "commands": ["editor.action.peekDefinition"]
+        },
+        {
             "before": ["g", "D"],
             "commands": ["editor.action.goToDeclaration"]
         },
         {
-            "before": ["g", "d"],
-            "commands": ["editor.action.goToDefinition"]
+            "before": ["g", "i"],
+            "commands": ["editor.action.goToImplementation"]
+        },
+        {
+            "before": ["g", "p", "i"],
+            "commands": ["editor.action.peekImplementation"]
         },
         {
             "before": ["g", "t"],
             "commands": ["editor.action.goToTypeDefinition"]
+        },
+        {
+            "before": ["g", "p", "t"],
+            "commands": ["editor.action.peekTypeDefinition"]
         },
         {
             "before": ["g", "K"],
@@ -39,6 +55,10 @@
         {
             "before": ["g", "h"],
             "commands": ["editor.action.showHover"]
+        },
+        {
+            "before": ["g", "q"],
+            "commands": ["editor.action.quickFix"]
         },
         // Plugin Config
         {
@@ -65,5 +85,25 @@
             "before": ["g", "h"],
             "commands": ["editor.action.showHover"]
         },
-    ]
+    ],
+    "[dockercompose]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.autoIndent": "advanced",
+        "editor.quickSuggestions": {
+            "other": true,
+            "comments": false,
+            "strings": true
+        },
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "[github-actions-workflow]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "remote.autoForwardPortsSource": "hybrid",
+    "git.ignoreRebaseWarning": true,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "claudeCode.preferredLocation": "sidebar",
+    "editor.aiStats.enabled": true,
+    "buildFiller.enabled": false
 }
