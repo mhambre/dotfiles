@@ -105,5 +105,6 @@
     "diffEditor.ignoreTrimWhitespace": false,
     "claudeCode.preferredLocation": "sidebar",
     "editor.aiStats.enabled": true,
-    "buildFiller.enabled": false
+    "buildFiller.enabled": false,
+    "editor.formatOnSave": true
 }

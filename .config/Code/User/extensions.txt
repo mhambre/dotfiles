@@ -1,5 +1,4 @@
 1yib.rust-bundle
-asvetliakov.vscode-neovim
 cs128.cs128-clang-tidy
 dustypomerleau.rust-syntax
 golang.go
@@ -21,6 +20,8 @@ shortarrow.line-number-deco
 tomrijndorp.find-it-faster
 vallentin.vscode-bnf
 vscodevim.vim
+redhat.vscode-yaml
+waderyan.gitblame
 willumz.generic-pseudocode
 yzane.markdown-pdf
 ms-vscode-remote.remote-ssh
@@ -30,3 +31,6 @@ ms-vscode-remote.vscode-remote-extensionpack
 ms-vscode.remote-explorer
 ms-vscode.remote-server
 openai.chatgpt
+danson.vscode-markdownlint
+editorconfig.editorconfig
+
