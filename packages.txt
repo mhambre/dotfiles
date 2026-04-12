@@ -10,3 +10,9 @@ tmux
 lua5.4
 luarocks
 black
+python3
+python3-pip
+python3-venv
+rustc
+cargo
+nvm
