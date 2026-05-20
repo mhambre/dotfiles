@@ -16,3 +16,4 @@ python3-venv
 rustc
 cargo
 nvm
+heaptrack
