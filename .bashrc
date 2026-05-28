@@ -171,3 +171,5 @@ if [ -d ~/.bashrc.d ]; then
     done
     unset file
 fi
+
+############# BELOW IS FOR SCRIPTS TO APPEND TO #############
