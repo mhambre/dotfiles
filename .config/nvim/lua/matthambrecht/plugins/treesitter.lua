@@ -1,8 +1,9 @@
 return {
   "nvim-treesitter/nvim-treesitter",
+  branch = "main",
+  lazy = false,
   build = ":TSUpdate",
-  ensure_installed = { "all" },
-  highlight = {
-      enable = true
-  }
+  config = function()
+    require("nvim-treesitter").setup()
+  end,
 }

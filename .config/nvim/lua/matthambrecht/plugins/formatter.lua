@@ -1,13 +1,25 @@
 return {
 	"stevearc/conform.nvim",
 	event = { "BufReadPre", "BufNewFile" },
-	opts = {
-		format_on_save = false,
-	},
 	config = function()
 		local conform = require("conform")
 
 		conform.setup({
+			format_on_save = {
+				lsp_fallback = true,
+				timeout_ms = 1000,
+			},
+			formatters = {
+				rustfmt = {
+					command = "rustup",
+					args = {
+						"run",
+						"nightly",
+						"rustfmt",
+						"--emit=stdout",
+					},
+				},
+			},
 			formatters_by_ft = {
 				javascript = { "prettier" },
 				typescript = { "prettier" },
@@ -23,10 +35,11 @@ return {
 				liquid = { "prettier" },
 				lua = { "stylua" },
 				python = { "isort", "black" },
+				rust = { "rustfmt" },
 			},
 		})
 
-		vim.keymap.set({ "n", "v" }, "<space>fm", function()
+		vim.keymap.set({ "n", "v" }, "<leader>p", function()
 			conform.format({
 				lsp_fallback = true,
 				async = false,
