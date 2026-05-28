@@ -116,7 +116,7 @@ function __setprompt
 
 	# Date or Venv
 	if [[ -z "${VIRTUAL_ENV}" ]]; then
-		PS1+="\[${CYAN}\] \$(date +%a) $(date +%b-'%-m')" # Date
+		PS1+="\[${CYAN}\] \$(date +%a) \$(date +%b-'%-d')" # Date
 		PS1+="${BLUE}  $(date +'%-I':%M:%S%P)\[${DARKGRAY}\] 󰐊 " # Time
 	else
 		PS1+="\[${CYAN}\] `basename $VIRTUAL_ENV`\[${DARKGRAY}\] 󰐊 "
