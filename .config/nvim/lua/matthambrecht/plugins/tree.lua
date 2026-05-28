@@ -8,30 +8,16 @@ return {
 	},
 	lazy = false,
 	opts = function()
-		local use_nerd = true
-
-		local nerd = {
-			added = "", -- nf-fa-plus
-			modified = "", -- nf-oct-dot_fill
-			deleted = "", -- nf-oct-diff_removed
-			renamed = "", -- nf-oct-diff_renamed
-			untracked = "", -- nf-fa-question
-			ignored = "", -- nf-cod-eye_closed (or "")
-			unstaged = "", -- nf-fa-dot_circle_o
-			staged = "", -- nf-fa-check_circle
-			conflict = "", -- nf-dev-git_compare
-		}
-
-		local ascii = {
-			added = "+",
-			modified = "~",
-			deleted = "-",
-			renamed = "→",
-			untracked = "?",
-			ignored = "!",
-			unstaged = "•",
-			staged = "✓",
-			conflict = "×",
+		local git_symbols = {
+			added = "A", -- added to git
+			modified = "M", -- modified in git
+			deleted = "D", -- deleted in git
+			renamed = "R", -- renamed in git
+			untracked = "?", -- not tracked by git
+			ignored = "I", -- ignored by git
+			unstaged = "U", -- changed but not staged
+			staged = "S", -- staged for commit
+			conflict = "C", -- merge conflict
 		}
 
 		return {
@@ -39,7 +25,7 @@ return {
 
 			enable_git_status = true,
 			git_status = {
-				symbols = use_nerd and nerd or ascii,
+				symbols = git_symbols,
 			},
 
 			default_component_configs = {
@@ -50,10 +36,10 @@ return {
 					default = "",
 				},
 				git_status = {
-					symbols = use_nerd and nerd or ascii,
+					symbols = git_symbols,
 				},
 				modified = {
-					symbol = use_nerd and "●" or "*",
+					symbol = "*",
 				},
 			},
 

@@ -11,12 +11,9 @@ return {
 			},
 			formatters = {
 				rustfmt = {
-					command = "rustup",
-					args = {
-						"run",
-						"nightly",
-						"rustfmt",
-						"--emit=stdout",
+					options = {
+						default_edition = "2024",
+						nightly = true,
 					},
 				},
 			},
