@@ -1,3 +1,4 @@
 .config/nvim/lazy/*
 .config/tabby/*
 .env
+*.log

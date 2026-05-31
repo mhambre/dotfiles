@@ -18,3 +18,6 @@ vim.opt.expandtab = true
 
 --- Clipboard
 vim.opt.clipboard = "unnamedplus"
+
+--- Editor Lines
+vim.opt.colorcolumn = "80,120"

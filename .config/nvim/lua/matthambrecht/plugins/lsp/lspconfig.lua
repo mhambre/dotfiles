@@ -40,6 +40,26 @@ return {
 				opts.desc = "See available code actions"
 				keymap.set({ "n", "v" }, "gca", vim.lsp.buf.code_action, opts) -- see available code actions, in visual mode will apply to selection
 
+				opts.desc = "Add missing imports"
+				keymap.set("n", "gci", function()
+					vim.lsp.buf.code_action({
+						apply = true,
+						context = {
+							only = { "source.addMissingImports.ts" },
+						},
+					})
+				end, opts)
+
+				opts.desc = "Organize imports"
+				keymap.set("n", "gco", function()
+					vim.lsp.buf.code_action({
+						apply = true,
+						context = {
+							only = { "source.organizeImports" },
+						},
+					})
+				end, opts)
+
 				opts.desc = "Smart rename"
 				keymap.set("n", "gr", vim.lsp.buf.rename, opts) -- smart rename
 
