@@ -183,6 +183,23 @@ _devu_bootstrap() {
         done
         devcontainer exec --workspace-folder "$ws" sh -c \
             "chown -R '$user' '$home/.bashrc.d' 2>/dev/null || true"
+        devcontainer exec --workspace-folder "$ws" sh -c "
+            rc='$home/.bashrc'
+            [ -f \"\$rc\" ] || touch \"\$rc\"
+            if ! grep -q 'devu bashrc.d' \"\$rc\" 2>/dev/null &&
+               ! grep -q '\\.bashrc\\.d/.*\\.sh' \"\$rc\" 2>/dev/null; then
+                {
+                    printf '\n# devu bashrc.d\n'
+                    printf 'if [ -d \"\$HOME/.bashrc.d\" ]; then\n'
+                    printf '    for f in \"\$HOME/.bashrc.d/\"*.sh; do\n'
+                    printf '        [ -r \"\$f\" ] && . \"\$f\"\n'
+                    printf '    done\n'
+                    printf '    unset f\n'
+                    printf 'fi\n'
+                } >> \"\$rc\"
+            fi
+            chown '$user' \"\$rc\" 2>/dev/null || true
+        "
     fi
 
     # ---------- neovim binary ----------
@@ -285,7 +302,6 @@ _devu_bootstrap() {
                 printf 'export COLORTERM=\${COLORTERM:-truecolor}\n'
                 printf 'export LANG=\${LANG:-C.UTF-8}\n'
                 printf 'export LC_ALL=\${LC_ALL:-C.UTF-8}\n'
-                printf 'if [ -d \"%s/.bashrc.d\" ]; then for f in \"%s/.bashrc.d/\"*.sh; do [ -r \"\$f\" ] && . \"\$f\"; done; unset f; fi\n' '$home' '$home'
             } >> \"\$rc\"
         done
     "
