@@ -39,6 +39,9 @@ return {
 				"pyright",
 				"eslint",
 				"rust_analyzer",
+				"gopls",
+				"clangd",
+				"bashls",
 			},
 		})
 
@@ -51,6 +54,7 @@ return {
 				"black",
 				"pylint",
 				"eslint_d",
+				"shellcheck", -- bashls delegates diagnostics to shellcheck
 			},
 		})
 	end,

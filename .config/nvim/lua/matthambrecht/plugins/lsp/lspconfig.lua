@@ -5,6 +5,7 @@ return {
 		"hrsh7th/cmp-nvim-lsp",
 		{ "antosha417/nvim-lsp-file-operations", config = true },
 		{ "folke/neodev.nvim", opts = {} },
+		{ "artemave/workspace-diagnostics.nvim", opts = {} },
 	},
 	config = function()
 		-- import cmp-nvim-lsp plugin
@@ -14,6 +15,14 @@ return {
 		vim.api.nvim_create_autocmd("LspAttach", {
 			group = vim.api.nvim_create_augroup("UserLspConfig", {}),
 			callback = function(ev)
+				-- Auto-index every file in the workspace: feeds all workspace files
+				-- to the server (fake didOpen) so diagnostics/symbols cover the whole
+				-- project, not just buffers you've opened.
+				local client = vim.lsp.get_client_by_id(ev.data.client_id)
+				if client and not client.name:lower():find("copilot") then
+					require("workspace-diagnostics").populate_workspace_diagnostics(client, ev.buf)
+				end
+
 				-- Buffer local mappings.
 				-- See `:help vim.lsp.*` for documentation on any of the below functions
 				local opts = { buffer = ev.buf, silent = true }
@@ -169,6 +178,17 @@ return {
 
 		-- Bash
 		vim.lsp.config("bashls", {})
+
+		-- C/C++ (clangd) — background-index builds a persistent index of the
+		-- whole project (needs compile_commands.json or compile_flags.txt at root)
+		vim.lsp.config("clangd", {
+			cmd = {
+				"clangd",
+				"--background-index",
+				"--clang-tidy",
+				"--completion-style=detailed",
+			},
+		})
 
 		-- Go
 		vim.lsp.config("gopls", {

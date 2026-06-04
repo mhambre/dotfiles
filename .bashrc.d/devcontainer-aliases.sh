@@ -4,9 +4,9 @@
 # Host-side config you want copied into every container. Override in env if needed.
 : "${DEVU_NVIM_CONFIG:=$HOME/.config/nvim}"
 : "${DEVU_NVIM_VERSION:=latest}"   # 'latest', 'stable', 'nightly', or a tag like v0.10.2
-: "${DEVU_NPM_GLOBALS:=@anthropic-ai/claude-code @openai/codex}"
+: "${DEVU_NPM_GLOBALS:=@anthropic-ai/claude-code @openai/codex tree-sitter-cli}"  # tree-sitter CLI for nvim-treesitter parser builds
 : "${DEVU_NODE_VERSION:=v22.11.0}"  # used when the container has no node/npm
-: "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf}"  # apt names; skipped if no sudo/apt
+: "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
 
 _devu_container_id() {
@@ -110,6 +110,7 @@ _devu_bootstrap() {
             python3-pip) bin=pip3 ;;
             python3-venv) bin=python3 ;;  # venv is a python3 module; presence implied by python3
             ripgrep) bin=rg ;;
+            golang-go) bin=go ;;
             bat) bin='bat || command -v batcat' ;;  # Debian ships bat as 'batcat'
             *) bin="$pkg" ;;
         esac
