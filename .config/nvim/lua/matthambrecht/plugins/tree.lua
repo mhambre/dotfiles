@@ -72,6 +72,7 @@ return {
 			},
 			window = {
 				width = 32,
+				position = "right",
 			},
 			event_handlers = {
 				{
