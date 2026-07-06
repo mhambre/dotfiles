@@ -4,7 +4,8 @@
 # Host-side config you want copied into every container. Override in env if needed.
 : "${DEVU_NVIM_CONFIG:=$HOME/.config/nvim}"
 : "${DEVU_NVIM_VERSION:=latest}"   # 'latest', 'stable', 'nightly', or a tag like v0.10.2
-: "${DEVU_NPM_GLOBALS:=@anthropic-ai/claude-code @openai/codex tree-sitter-cli}"  # tree-sitter CLI for nvim-treesitter parser builds
+: "${DEVU_NPM_GLOBALS:=@anthropic-ai/claude-code @openai/codex @github/copilot tree-sitter-cli}"  # tree-sitter CLI for nvim-treesitter parser builds
+: "${DEVU_AGENT_DIRS:=skills hooks}"  # subdirs copied for each agent config dir (~/.claude ~/.codex ~/.copilot)
 : "${DEVU_NODE_VERSION:=v22.11.0}"  # used when the container has no node/npm
 : "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
@@ -21,18 +22,21 @@ _devu_remote_user() {
 }
 
 # Copy a host file/dir into the container at the given dest, then chown to remote user.
+# Never fails the bootstrap: the devcontainer may bind-mount the dest (docker cp
+# then errors or is redundant), so a failed copy is just a warning.
 # $1=ws  $2=cid  $3=user  $4=host_path  $5=dest_path_in_container
 _devu_cp() {
     local ws="$1" cid="$2" user="$3" src="$4" dst="$5"
     [ -e "$src" ] || return 0
-    devcontainer exec --workspace-folder "$ws" mkdir -p "$(dirname "$dst")"
+    devcontainer exec --workspace-folder "$ws" mkdir -p "$(dirname "$dst")" 2>/dev/null
     if [ -d "$src" ]; then
-        docker cp "$src/." "$cid:$dst" >/dev/null
+        docker cp "$src/." "$cid:$dst" >/dev/null 2>&1
     else
-        docker cp "$src" "$cid:$dst" >/dev/null
-    fi
+        docker cp "$src" "$cid:$dst" >/dev/null 2>&1
+    fi || echo "devu:   warning: copy to $dst failed (bind mount?) — continuing"
     devcontainer exec --workspace-folder "$ws" sh -c \
         "chown -R '$user' '$dst' 2>/dev/null || true"
+    return 0
 }
 
 _devu_bootstrap() {
@@ -67,10 +71,15 @@ _devu_bootstrap() {
         devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.claude"
         for f in .credentials.json settings.json settings.local.json CLAUDE.md; do
             [ -e "$HOME/.claude/$f" ] && \
-                docker cp "$HOME/.claude/$f" "$cid:$home/.claude/$f" >/dev/null
+                { docker cp "$HOME/.claude/$f" "$cid:$home/.claude/$f" >/dev/null 2>&1 \
+                    || echo "devu:   warning: copy of .claude/$f failed (bind mount?) — continuing"; }
+        done
+        for d in $DEVU_AGENT_DIRS; do
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.claude/$d" "$home/.claude/$d"
         done
         [ -f "$HOME/.claude.json" ] && \
-            docker cp "$HOME/.claude.json" "$cid:$home/.claude.json" >/dev/null
+            { docker cp "$HOME/.claude.json" "$cid:$home/.claude.json" >/dev/null 2>&1 \
+                || echo "devu:   warning: copy of .claude.json failed (bind mount?) — continuing"; }
         devcontainer exec --workspace-folder "$ws" sh -c \
             "chown -R '$user' '$home/.claude' '$home/.claude.json' 2>/dev/null || true"
     fi
@@ -81,18 +90,37 @@ _devu_bootstrap() {
         devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.codex"
         for f in auth.json config.toml; do
             [ -e "$HOME/.codex/$f" ] && \
-                docker cp "$HOME/.codex/$f" "$cid:$home/.codex/$f" >/dev/null
+                { docker cp "$HOME/.codex/$f" "$cid:$home/.codex/$f" >/dev/null 2>&1 \
+                    || echo "devu:   warning: copy of .codex/$f failed (bind mount?) — continuing"; }
+        done
+        for d in $DEVU_AGENT_DIRS prompts; do
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.codex/$d" "$home/.codex/$d"
         done
         devcontainer exec --workspace-folder "$ws" sh -c \
             "chown -R '$user' '$home/.codex' 2>/dev/null || true"
     fi
 
+    # ---------- copilot cli config ----------
+    # Selective copy — skip session-state/logs/sqlite session store.
+    if [ -d "$HOME/.copilot" ]; then
+        echo "devu:   copying copilot config"
+        devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.copilot"
+        for f in config.json mcp-config.json; do
+            [ -e "$HOME/.copilot/$f" ] && \
+                { docker cp "$HOME/.copilot/$f" "$cid:$home/.copilot/$f" >/dev/null 2>&1 \
+                    || echo "devu:   warning: copy of .copilot/$f failed (bind mount?) — continuing"; }
+        done
+        for d in $DEVU_AGENT_DIRS agents; do
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.copilot/$d" "$home/.copilot/$d"
+        done
+        devcontainer exec --workspace-folder "$ws" sh -c \
+            "chown -R '$user' '$home/.copilot' 2>/dev/null || true"
+    fi
+
     # ---------- tmux config ----------
     if [ -f "$HOME/.tmux.conf" ]; then
         echo "devu:   copying tmux config"
-        docker cp "$HOME/.tmux.conf" "$cid:$home/.tmux.conf" >/dev/null
-        devcontainer exec --workspace-folder "$ws" sh -c \
-            "chown '$user' '$home/.tmux.conf' 2>/dev/null || true"
+        _devu_cp "$ws" "$cid" "$user" "$HOME/.tmux.conf" "$home/.tmux.conf"
     fi
 
     # ---------- github copilot creds ----------
@@ -273,6 +301,7 @@ _devu_bootstrap() {
             case "$pkg" in
                 @anthropic-ai/claude-code) bin=claude ;;
                 @openai/codex) bin=codex ;;
+                @github/copilot) bin=copilot ;;
                 *) bin="${pkg##*/}" ; bin="${bin%-cli}" ;;
             esac
             if ! devcontainer exec --workspace-folder "$ws" sh -c \
