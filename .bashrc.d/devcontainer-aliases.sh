@@ -5,7 +5,7 @@
 : "${DEVU_NVIM_CONFIG:=$HOME/.config/nvim}"
 : "${DEVU_NVIM_VERSION:=latest}"   # 'latest', 'stable', 'nightly', or a tag like v0.10.2
 : "${DEVU_NODE_MANIFEST:=}"  # defaults to package.json beside the installed dotfiles
-: "${DEVU_AGENT_DIRS:=skills hooks}"  # subdirs copied for each agent config dir (~/.claude ~/.codex ~/.copilot)
+: "${DEVU_SHARED_AGENT_CONFIG:=$HOME/.agents}"
 : "${DEVU_NODE_VERSION:=v22.11.0}"  # used when the container has no node/npm
 : "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
@@ -13,15 +13,22 @@
 
 _devu_npm_globals() {
     local manifest="$DEVU_NODE_MANIFEST"
-    local source_dir packages
+    local source_dir shared_agents packages
 
     if [ -z "$manifest" ]; then
         source_dir="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
         if [ -f "$source_dir/../package.json" ]; then
             manifest="$source_dir/../package.json"
-        elif [ -f "$HOME/package.json" ]; then
-            manifest="$HOME/package.json"
         fi
+    fi
+    if [ -z "$manifest" ] && [ -d "$DEVU_SHARED_AGENT_CONFIG" ]; then
+        shared_agents="$(realpath "$DEVU_SHARED_AGENT_CONFIG")"
+        if [ -f "$shared_agents/../package.json" ]; then
+            manifest="$shared_agents/../package.json"
+        fi
+    fi
+    if [ -z "$manifest" ] && [ -f "$HOME/package.json" ]; then
+        manifest="$HOME/package.json"
     fi
 
     if [ -z "$manifest" ] || [ ! -r "$manifest" ]; then
@@ -69,11 +76,12 @@ _devu_remote_user() {
 _devu_cp() {
     local ws="$1" cid="$2" user="$3" src="$4" dst="$5"
     [ -e "$src" ] || return 0
-    devcontainer exec --workspace-folder "$ws" mkdir -p "$(dirname "$dst")" 2>/dev/null
+    devcontainer exec --workspace-folder "$ws" sh -c \
+        "[ ! -L '$dst' ] || rm -f '$dst'; mkdir -p '$(dirname "$dst")'" 2>/dev/null
     if [ -d "$src" ]; then
-        docker cp "$src/." "$cid:$dst" >/dev/null 2>&1
+        docker cp -L "$src/." "$cid:$dst" >/dev/null 2>&1
     else
-        docker cp "$src" "$cid:$dst" >/dev/null 2>&1
+        docker cp -L "$src" "$cid:$dst" >/dev/null 2>&1
     fi || echo "devu:   warning: copy to $dst failed (bind mount?) — continuing"
     devcontainer exec --workspace-folder "$ws" sh -c \
         "chown -R '$user' '$dst' 2>/dev/null || true"
@@ -82,7 +90,7 @@ _devu_cp() {
 
 _devu_bootstrap() {
     local ws="${1:-$PWD}"
-    local cid user home arch tarname node_arch
+    local cid user home arch tarname node_arch shared_agents
     cid="$(_devu_container_id "$ws")"
     if [ -z "$cid" ]; then
         echo "devu: could not locate container for $ws" >&2
@@ -105,24 +113,29 @@ _devu_bootstrap() {
         _devu_cp "$ws" "$cid" "$user" "$DEVU_NVIM_CONFIG" "$home/.config/nvim"
     fi
 
+    # Shared rules, skills, agents, commands, and hooks.
+    shared_agents=""
+    if [ -d "$DEVU_SHARED_AGENT_CONFIG" ]; then
+        shared_agents="$(realpath "$DEVU_SHARED_AGENT_CONFIG")"
+        echo "devu:   copying shared agent config"
+        _devu_cp "$ws" "$cid" "$user" "$shared_agents" "$home/.agents"
+    fi
+
     # ---------- claude config + creds ----------
     # Selective copy — skip the giant per-project history dirs.
     if [ -d "$HOME/.claude" ]; then
         echo "devu:   copying claude config"
         devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.claude"
         for f in .credentials.json settings.json settings.local.json CLAUDE.md; do
-            [ -e "$HOME/.claude/$f" ] && \
-                { docker cp "$HOME/.claude/$f" "$cid:$home/.claude/$f" >/dev/null 2>&1 \
-                    || echo "devu:   warning: copy of .claude/$f failed (bind mount?) — continuing"; }
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.claude/$f" "$home/.claude/$f"
         done
-        for d in $DEVU_AGENT_DIRS; do
-            _devu_cp "$ws" "$cid" "$user" "$HOME/.claude/$d" "$home/.claude/$d"
-        done
-        [ -f "$HOME/.claude.json" ] && \
-            { docker cp "$HOME/.claude.json" "$cid:$home/.claude.json" >/dev/null 2>&1 \
-                || echo "devu:   warning: copy of .claude.json failed (bind mount?) — continuing"; }
-        devcontainer exec --workspace-folder "$ws" sh -c \
-            "chown -R '$user' '$home/.claude' '$home/.claude.json' 2>/dev/null || true"
+        _devu_cp "$ws" "$cid" "$user" "$HOME/.claude.json" "$home/.claude.json"
+        if [ -n "$shared_agents" ]; then
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/rules" "$home/.claude/rules"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/skills" "$home/.claude/skills"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/agents/claude" "$home/.claude/agents"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/commands" "$home/.claude/commands"
+        fi
     fi
 
     # ---------- codex creds + config ----------
@@ -130,15 +143,15 @@ _devu_bootstrap() {
         echo "devu:   copying codex creds"
         devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.codex"
         for f in auth.json config.toml; do
-            [ -e "$HOME/.codex/$f" ] && \
-                { docker cp "$HOME/.codex/$f" "$cid:$home/.codex/$f" >/dev/null 2>&1 \
-                    || echo "devu:   warning: copy of .codex/$f failed (bind mount?) — continuing"; }
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.codex/$f" "$home/.codex/$f"
         done
-        for d in $DEVU_AGENT_DIRS prompts; do
+        for d in skills hooks prompts; do
             _devu_cp "$ws" "$cid" "$user" "$HOME/.codex/$d" "$home/.codex/$d"
         done
-        devcontainer exec --workspace-folder "$ws" sh -c \
-            "chown -R '$user' '$home/.codex' 2>/dev/null || true"
+        if [ -n "$shared_agents" ]; then
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/AGENTS.md" "$home/.codex/AGENTS.md"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/hooks/codex.json" "$home/.codex/hooks.json"
+        fi
     fi
 
     # ---------- copilot cli config ----------
@@ -146,16 +159,15 @@ _devu_bootstrap() {
     if [ -d "$HOME/.copilot" ]; then
         echo "devu:   copying copilot config"
         devcontainer exec --workspace-folder "$ws" mkdir -p "$home/.copilot"
-        for f in config.json mcp-config.json; do
-            [ -e "$HOME/.copilot/$f" ] && \
-                { docker cp "$HOME/.copilot/$f" "$cid:$home/.copilot/$f" >/dev/null 2>&1 \
-                    || echo "devu:   warning: copy of .copilot/$f failed (bind mount?) — continuing"; }
+        for f in config.json mcp-config.json settings.json; do
+            _devu_cp "$ws" "$cid" "$user" "$HOME/.copilot/$f" "$home/.copilot/$f"
         done
-        for d in $DEVU_AGENT_DIRS agents; do
-            _devu_cp "$ws" "$cid" "$user" "$HOME/.copilot/$d" "$home/.copilot/$d"
-        done
-        devcontainer exec --workspace-folder "$ws" sh -c \
-            "chown -R '$user' '$home/.copilot' 2>/dev/null || true"
+        if [ -n "$shared_agents" ]; then
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/skills" "$home/.copilot/skills"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/agents/copilot" "$home/.copilot/agents"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/hooks/copilot" "$home/.copilot/hooks"
+            _devu_cp "$ws" "$cid" "$user" "$shared_agents/AGENTS.md" "$home/.copilot/copilot-instructions.md"
+        fi
     fi
 
     # ---------- tmux config ----------
