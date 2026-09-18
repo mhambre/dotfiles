@@ -20,7 +20,7 @@ return {
 
 				-- set keybinds
 				opts.desc = "Show LSP references"
-				keymap.set("n", "gR", "<cmd>Telescope lsp_references<CR>", opts) -- show definition, references
+				keymap.set("n", "gr", "<cmd>Telescope lsp_references<CR>", opts) -- show definition, references
 
 				opts.desc = "Go to declaration"
 				keymap.set("n", "gD", vim.lsp.buf.declaration, opts) -- go to declaration
@@ -61,7 +61,7 @@ return {
 				end, opts)
 
 				opts.desc = "Smart rename"
-				keymap.set("n", "gr", vim.lsp.buf.rename, opts) -- smart rename
+				keymap.set("n", "gR", vim.lsp.buf.rename, opts) -- smart rename
 
 				opts.desc = "Show buffer diagnostics"
 				keymap.set("n", "gH", "<cmd>Telescope diagnostics bufnr=0<CR>", opts) -- show  diagnostics for file
