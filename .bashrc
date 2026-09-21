@@ -16,7 +16,10 @@ fi
 #####################
 ## Default Exports ##
 #####################
-interactive=$(expr index "$-" i)
+case "$-" in
+    *i*) interactive=1 ;;
+    *)   interactive= ;;
+esac
 export HISTFILESIZE=10000
 export HISTSIZE=500
 export HISTCONTROL=erasedups:ignoredups:ignorespace
