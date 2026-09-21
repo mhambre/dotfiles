@@ -119,8 +119,8 @@ hl("DiagnosticInfo", { fg = p.c12 })
 hl("DiagnosticHint", { fg = p.c14 })
 hl("DiagnosticOk", { fg = p.c6 })
 
-hl("DiagnosticUnderlineError", { undercurl = true, sp = p.c9 })
-hl("DiagnosticUnderlineWarn", { undercurl = true, sp = p.c11 })
+hl("DiagnosticUnderlineError", { undercurl = true, sp = "#ff8080" })
+hl("DiagnosticUnderlineWarn", { undercurl = true, sp = "#ffff80" })
 hl("DiagnosticUnderlineInfo", { undercurl = true, sp = p.c12 })
 hl("DiagnosticUnderlineHint", { undercurl = true, sp = p.c14 })
 

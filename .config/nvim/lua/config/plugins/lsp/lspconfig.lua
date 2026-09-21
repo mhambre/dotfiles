@@ -159,6 +159,11 @@ return {
 					cargo = {
 						allFeatures = true,
 					},
+					completion = {
+						autoimport = {
+							enable = true,
+						},
+					},
 					check = {
 						command = "clippy",
 					},
