@@ -5,3 +5,4 @@ node_modules/
 *.log
 .agents/skills/*/node_modules
 .agents/AGENTS.md
+local-*
