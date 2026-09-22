@@ -1,16 +1,11 @@
 # Shortcut for common tool use
 
-# Common enough aliases
-alias src="source ~/.bashrc"
-alias la="ls -la"
-alias lg="lazygit"
-alias k9="kill -9"
-
 # Open fzf file in vim
 function vzf () { 
     file=$(fzf)
     vi $file
 }
+
 if command -v nvim >/dev/null 2>&1; then
   alias vim='nvim'
 else
@@ -32,7 +27,13 @@ function pok () {
     fi
 }
 
-# Drop page cache for profiling
-function dpc () {
+# Refresh page cache for profiling
+function rpc () {
     sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+}
+
+# Refresh dns
+function rdns () {
+    sudo resolvectl flush-caches
+    sudo systemctl restart systemd-resolved
 }
