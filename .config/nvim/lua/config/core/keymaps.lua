@@ -24,6 +24,7 @@ vim.keymap.set({ "n", "v" }, "<C-w>%", "<cmd>vsp<CR>")
 
 --- General Keybinds
 vim.keymap.set({ "n", "v", "i" }, "<C-s>", "<cmd>w<CR>")
+vim.keymap.set({ "n", "v", "i" }, "<F1>", "<nop>")
 
 --- Close stray floats and force a full redraw
 vim.keymap.set("n", "<leader>rr", function()
