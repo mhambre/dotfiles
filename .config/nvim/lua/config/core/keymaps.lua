@@ -25,6 +25,16 @@ vim.keymap.set({ "n", "v" }, "<C-w>%", "<cmd>vsp<CR>")
 --- General Keybinds
 vim.keymap.set({ "n", "v", "i" }, "<C-s>", "<cmd>w<CR>")
 
+--- Close stray floats and force a full redraw
+vim.keymap.set("n", "<leader>rr", function()
+	for _, win in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_config(win).relative ~= "" then
+			vim.api.nvim_win_close(win, true)
+		end
+	end
+	vim.cmd("nohlsearch | diffupdate | redrawstatus! | redraw!")
+end, { desc = "Refresh display" })
+
 --- Paste without overwriting the default register
 vim.keymap.set("x", "p", "P")
 
