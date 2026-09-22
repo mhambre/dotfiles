@@ -22,6 +22,7 @@ return {
 
 		return {
 			sources = { "filesystem", "buffers", "git_status" },
+			use_popups_for_input = false,
 
 			enable_git_status = true,
 			git_status = {
