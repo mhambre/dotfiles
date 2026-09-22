@@ -31,3 +31,8 @@ function pok () {
         echo "No process found on port $1"
     fi
 }
+
+# Drop page cache for profiling
+function dpc () {
+    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+}
