@@ -157,7 +157,8 @@ return {
 			settings = {
 				["rust-analyzer"] = {
 					cargo = {
-						allFeatures = true,
+						allTargets = true,
+						features = "all",
 					},
 					completion = {
 						autoimport = {
@@ -165,7 +166,10 @@ return {
 						},
 					},
 					check = {
+						allTargets = true,
 						command = "clippy",
+						features = "all",
+						workspace = true,
 					},
 				},
 			},
