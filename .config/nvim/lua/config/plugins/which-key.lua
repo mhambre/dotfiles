@@ -8,6 +8,7 @@ return {
 			{ "<leader>a", group = "Agentic", mode = { "n", "v" } },
 			{ "<leader>f", group = "Find", mode = { "n", "v" } },
 			{ "<leader>g", group = "Git", mode = { "n", "v" } },
+			{ "<leader>n", group = "Notes", mode = { "n", "v" } },
 			{ "<leader>r", group = "Run Tools" },
 			{ "<leader>t", group = "Trouble", mode = { "n", "v" } },
 			{ "<leader>w", group = "Workspace" },
