@@ -19,6 +19,8 @@ return {
 				untracked = { text = "?" },
 			},
 			signcolumn = true,
+			-- below meow.review's 5
+			sign_priority = 4,
 			current_line_blame = true,
 			current_line_blame_opts = {
 				delay = 200,

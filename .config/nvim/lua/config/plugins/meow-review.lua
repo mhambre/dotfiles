@@ -3,7 +3,16 @@ return {
 	dependencies = { "MunifTanjim/nui.nvim" },
 	event = "VeryLazy",
 	config = function()
-		require("meow.review").setup({})
+		require("meow.review").setup({
+			-- keep annotations out of the worktree, .git is per repo and never committed
+			store_path = ".git/meow-review/annotations.json",
+			auto_gitignore = false,
+			annotation_types = {
+				ISSUE = { icon = "\u{f188}" },
+				SUGGESTION = { icon = "\u{f0eb}" },
+				NOTE = { icon = "\u{f075}" },
+			},
+		})
 	end,
 	keys = {
 		{ "<leader>na", "<Plug>(MeowReviewAdd)", mode = { "n", "v" }, desc = "Note add" },
