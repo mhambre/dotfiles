@@ -28,3 +28,9 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 
 --- Editor Lines
 vim.opt.colorcolumn = "80,120"
+
+--- Session-local global marks
+vim.opt.shada:append("f0")
+vim.api.nvim_create_autocmd("VimEnter", {
+	command = "delmarks A-Z0-9",
+})
