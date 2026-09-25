@@ -45,6 +45,62 @@ data:
       evaluation_interval: 15s
 
     scrape_configs:
+      # --- add-on scraping (generic; workloads opt in via annotations) ---
+      # Any pod annotated prometheus.io/scrape=true is scraped, using its
+      # prometheus.io/{path,port,scheme} annotations. camberfs pods carry these
+      # already; a personal project just adds the same annotations, no edit here.
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+            action: replace
+            target_label: __scheme__
+            regex: (https?)
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            target_label: app
+
+      # --- standing exporters (generic; workloads in exporters.yaml) ---
+      # node-exporter: node cpu/mem/disk/network/load. instance = node name.
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: telemetry;node-exporter;metrics
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: instance
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: kubernetes_node
+
+      # kube-state-metrics: limits/requests, allocatable, phase, restarts, conditions.
+      - job_name: kube-state-metrics
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: telemetry;kube-state-metrics;http-metrics
+
       # Per-pod / per-node CPU and working set. 2s so short install-time peaks
       # aren't averaged away; drop to 15s for long-lived deployments.
       - job_name: kubernetes-cadvisor
@@ -230,6 +286,72 @@ spec:
     requests:
       storage: 4Gi
 ---
+# Generic Prometheus datasource (project agnostic).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource
+  namespace: telemetry
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://prometheus.telemetry.svc:9090
+        isDefault: true
+        editable: true
+---
+# Dashboard provider: Grafana loads any file the sidecar drops in this dir.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: telemetry
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: sidecar
+        orgId: 1
+        type: file
+        disableDeletion: false
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: telemetry
+---
+# Lets the dashboard sidecar discover labeled ConfigMaps cluster wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: grafana-dashboard-sidecar
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: grafana-dashboard-sidecar
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana-dashboard-sidecar
+subjects:
+  - kind: ServiceAccount
+    name: grafana
+    namespace: telemetry
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -245,6 +367,7 @@ spec:
       labels:
         app: grafana
     spec:
+      serviceAccountName: grafana
       securityContext:
         fsGroup: 472
         runAsUser: 472
@@ -264,10 +387,53 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/grafana
               name: grafana-storage
+            # datasource + dashboard provider are generic (project agnostic)
+            - mountPath: /etc/grafana/provisioning/datasources
+              name: grafana-datasource
+              readOnly: true
+            - mountPath: /etc/grafana/provisioning/dashboards
+              name: grafana-dashboards-provider
+              readOnly: true
+            # dashboards land here from the sidecar (shared, ephemeral)
+            - mountPath: /var/lib/grafana/dashboards
+              name: sc-dashboards
+        # Watches ConfigMaps labeled grafana_dashboard=1 in any namespace and
+        # writes them into the shared dashboards dir. Add-ons ship a labeled
+        # ConfigMap; no edit here to add or remove a dashboard.
+        - name: grafana-sc-dashboards
+          image: kiwigrid/k8s-sidecar:1.27.4
+          env:
+            - name: LABEL
+              value: grafana_dashboard
+            - name: LABEL_VALUE
+              value: "1"
+            - name: FOLDER
+              value: /var/lib/grafana/dashboards
+            - name: RESOURCE
+              value: configmap
+            - name: NAMESPACE
+              value: ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /var/lib/grafana/dashboards
+              name: sc-dashboards
       volumes:
         - name: grafana-storage
           persistentVolumeClaim:
             claimName: grafana-pvc
+        - name: grafana-datasource
+          configMap:
+            name: grafana-datasource
+        - name: grafana-dashboards-provider
+          configMap:
+            name: grafana-dashboards-provider
+        - name: sc-dashboards
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -275,10 +441,11 @@ metadata:
   name: grafana
   namespace: telemetry
 spec:
+  # ClusterIP: external access is via grafana-external.yaml (NodePort 32001),
+  # so the core Service claims no fixed node port and cannot collide.
   ports:
     - port: 3000
       targetPort: 3000
-      nodePort: 32000
   selector:
     app: grafana
-  type: NodePort
+  type: ClusterIP
