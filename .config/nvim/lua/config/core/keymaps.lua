@@ -2,6 +2,7 @@
 --- Plugin Keybinds
 vim.keymap.set({ "n", "v" }, "<leader>ff", "<cmd>Telescope find_files hidden=true<CR>", { desc = "Find files" })
 vim.keymap.set({ "n", "v" }, "<leader>fw", "<cmd>Telescope live_grep<CR>", { desc = "Find text in workspace" })
+vim.keymap.set({ "n", "v" }, "<leader>fr", "<cmd>Telescope resume<CR>", { desc = "Resume last search" })
 vim.keymap.set({ "n", "v" }, "<leader>fd", "<cmd>Telescope lsp_definitions<CR>", { desc = "Find LSP definitions" })
 vim.keymap.set({ "n", "v" }, "<leader>fg", "<cmd>Telescope git_status<CR>", { desc = "Find git changes" })
 vim.keymap.set(
