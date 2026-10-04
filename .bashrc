@@ -1,5 +1,17 @@
 #!/bin/bash
 
+case $- in
+	*i*) ;;
+	*) return ;;
+esac
+
+for homebrew_prefix in /opt/homebrew /home/linuxbrew/.linuxbrew; do
+	if [[ -d "$homebrew_prefix/bin" && ":$PATH:" != *":$homebrew_prefix/bin:"* ]]; then
+		export PATH="$homebrew_prefix/bin:$homebrew_prefix/sbin:$PATH"
+	fi
+done
+unset homebrew_prefix
+
 #################
 ## Global Prep ##
 #################
@@ -16,19 +28,16 @@ fi
 #####################
 ## Default Exports ##
 #####################
-case "$-" in
-    *i*) interactive=1 ;;
-    *)   interactive= ;;
-esac
 export HISTFILESIZE=10000
 export HISTSIZE=500
 export HISTCONTROL=erasedups:ignoredups:ignorespace
 shopt -s checkwinsize
 shopt -s histappend
-PROMPT_COMMAND='history -a'
-stty -ixon
-if [[ $interactive -gt 0 ]]; then bind "set completion-ignore-case on"; fi
-if [[ $interactive -gt 0 ]]; then bind "set show-all-if-ambiguous On"; fi
+if [[ -t 0 ]]; then
+	stty -ixon
+fi
+bind "set completion-ignore-case on"
+bind "set show-all-if-ambiguous On"
 
 # Set the default editor
 export EDITOR=$(command -v nvim >/dev/null 2>&1 && echo nvim || echo vim)
@@ -140,8 +149,8 @@ function __setprompt
 		PS1+="\[${YELLOW}\] $(git rev-parse --abbrev-ref HEAD)\[${DARKGRAY}\]"
 	else
 		# File info
-		PS1+="\[${GREEN}\] $(/bin/ls -lah | /bin/grep -m 1 total | /bin/sed 's/total //') "
-		PS1+="\[${GREEN}\] \$(/bin/ls -A -1 | /usr/bin/wc -l)\[${DARKGRAY}\]"
+		PS1+="\[${GREEN}\] $(command ls -lah | command grep -m 1 total | command sed 's/total //') "
+		PS1+="\[${GREEN}\] \$(command ls -A -1 | command wc -l)\[${DARKGRAY}\]"
 	fi	
 
 	if [[ $EUID -ne 0 ]]; then
@@ -156,13 +165,7 @@ function __setprompt
 	PS4='\[${DARKGRAY}\]+\[${NOCOLOR}\] '
 }
 
-PROMPT_COMMAND='__setprompt'
-
-# If not running interactively, don't do anything
-case $- in
-	*i*) ;;
-	*) return ;;
-esac
+PROMPT_COMMAND='__setprompt; history -a'
 
 # Loads individual ~/.bashrc.d files
 if [ -d ~/.bashrc.d ]; then

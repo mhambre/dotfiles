@@ -1,21 +1,19 @@
-# 1) Load bash-completion (common paths)
-if ! shopt -oq posix; then
-  for f in /usr/share/bash-completion/bash_completion /etc/bash_completion; do
-    [ -r "$f" ] && source "$f" && break
-  done
-fi
+if command -v kubectl >/dev/null 2>&1; then
+  if ! shopt -oq posix; then
+    for f in /usr/share/bash-completion/bash_completion /etc/bash_completion; do
+      [ -r "$f" ] && source "$f" && break
+    done
+  fi
 
-# 2) Load kubectl completion function
-# (use the distro-provided one if it exists; otherwise fall back to kubectl's output)
-if [ -r /usr/share/bash-completion/completions/_kubectl ]; then
-  source /usr/share/bash-completion/completions/_kubectl
-else
-  source <(kubectl completion bash)
-fi
+  if [ -r /usr/share/bash-completion/completions/_kubectl ]; then
+    source /usr/share/bash-completion/completions/_kubectl
+  else
+    source <(kubectl completion bash)
+  fi
 
-# 3) Alias + completion for alias
-alias k=kubectl
-complete -o default -F __start_kubectl k 2>/dev/null || complete -o default -F _kubectl k
+  alias k=kubectl
+  complete -o default -F __start_kubectl k 2>/dev/null || complete -o default -F _kubectl k
+fi
 
 # Extra Aliases
 
