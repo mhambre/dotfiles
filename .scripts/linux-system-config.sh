@@ -41,6 +41,7 @@ configure_sysctl() {
 		printf '%s\n' 'fs.inotify.max_user_watches = 524288'
 		printf '%s\n' 'fs.inotify.max_user_instances = 512'
 		printf '%s\n' 'fs.inotify.max_queued_events = 32768'
+        printf '%s\n' 'kernel.yama.ptrace_scope = 0'
 	} > "$config"
 
 	install_config "$config" "$target"
