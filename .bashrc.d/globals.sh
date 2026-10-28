@@ -1,6 +1,7 @@
 export QT_STYLE_OVERRIDE=Fusion
 export QT_QPA_PLATFORMTHEME=qt5ct
 export ENABLE_LSP_TOOL=1
+export CFS_REPO=${CFS_REPO:-$HOME/PAI/Development/camberfs}
 export KUBE_EDITOR=$(which nvim)
 export GPG_TTY=$(tty)
 
