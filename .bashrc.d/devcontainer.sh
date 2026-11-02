@@ -6,7 +6,7 @@
 : "${DEVU_NVIM_VERSION:=latest}"   # 'latest', 'stable', 'nightly', or a tag like v0.10.2
 : "${DEVU_NODE_MANIFEST:=}"  # defaults to package.json beside the installed dotfiles
 : "${DEVU_SHARED_AGENT_CONFIG:=$HOME/.agents}"
-: "${DEVU_NODE_VERSION:=v22.11.0}"  # used when the container has no node/npm
+: "${DEVU_NODE_VERSION:=v24.22.2}"  # used when the container has no node/npm
 : "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
 : "${DEVU_GIT_CRED_HOSTS:=github.com gitlab.tools.basedweights.com huggingface.co}"  # https hosts whose creds get exported from the host credential helper
