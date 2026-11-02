@@ -45,13 +45,15 @@ alias cfsmntlg='cfs mount logs'
 alias cfsex='cfs exec'
 alias cfsgdb='cfs gdb'
 alias cfscsigdb='cfs csi gdb'
+alias cfsht='cfs heaptrack'
+alias cfscsiht='cfs csi heaptrack'
 alias cfscurl='cfs curl'
 alias cfsdb='cfs db'
 alias cfsvk='cfs valkey'
 
 function _cfs_completion() {
-  local commands="camberfs server csi mount db valkey ui status pods lb storage top events context aliases alias oai openapi logs exec gdb delete curl curl-status curl-stop help"
-  local target_actions="pods logs exec gdb delete"
+  local commands="camberfs server csi mount db valkey ui status pods lb storage top events context aliases alias oai openapi logs exec gdb heaptrack ht delete curl curl-status curl-stop help"
+  local target_actions="pods logs exec gdb heaptrack ht delete"
   local cur=${COMP_WORDS[COMP_CWORD]}
   local prev=${COMP_WORDS[COMP_CWORD-1]}
   if [ "$COMP_CWORD" -eq 1 ]; then
@@ -65,7 +67,7 @@ function _cfs_completion() {
         COMPREPLY=($(compgen -W "$target_actions" -- "$cur"))
         return
       fi
-      if [ "$COMP_CWORD" -eq 3 ] && [[ "${COMP_WORDS[2]}" =~ ^(logs|log|lg|l|exec|ex|e|gdb|g|delete|del|d|rm)$ ]]; then
+      if [ "$COMP_CWORD" -eq 3 ] && [[ "${COMP_WORDS[2]}" =~ ^(logs|log|lg|l|exec|ex|e|gdb|g|heaptrack|ht|delete|del|d|rm)$ ]]; then
         mapfile -t COMPREPLY < <(cfs __complete pods "${COMP_WORDS[1]}" "$cur" 2>/dev/null)
         return
       fi
@@ -75,12 +77,12 @@ function _cfs_completion() {
         COMPREPLY=($(compgen -W "$target_actions shell" -- "$cur"))
         return
       fi
-      if [ "$COMP_CWORD" -eq 3 ] && [[ "${COMP_WORDS[2]}" =~ ^(logs|log|lg|l|exec|ex|e|shell|sh|gdb|g|delete|del|d|rm)$ ]]; then
+      if [ "$COMP_CWORD" -eq 3 ] && [[ "${COMP_WORDS[2]}" =~ ^(logs|log|lg|l|exec|ex|e|shell|sh|gdb|g|heaptrack|ht|delete|del|d|rm)$ ]]; then
         mapfile -t COMPREPLY < <(cfs __complete pods "${COMP_WORDS[1]}" "$cur" 2>/dev/null)
         return
       fi
       ;;
-    logs|log|lg|l|exec|ex|e|gdb|g|delete|del|d|rm)
+    logs|log|lg|l|exec|ex|e|gdb|g|heaptrack|ht|delete|del|d|rm)
       if [ "$COMP_CWORD" -eq 2 ]; then
         mapfile -t COMPREPLY < <(cfs __complete pods server "$cur" 2>/dev/null)
         return

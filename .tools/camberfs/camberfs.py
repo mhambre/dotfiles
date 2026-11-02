@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import signal
 import socket
 import subprocess
@@ -54,6 +55,7 @@ TARGET_COMMAND_ALIASES = {
     "shell": "exec",
     "sh": "exec",
     "g": "gdb",
+    "ht": "heaptrack",
     "del": "delete",
     "d": "delete",
     "rm": "delete",
@@ -131,6 +133,9 @@ HELP_SECTIONS = (
             ("gdb [TARGET] [PROCESS]", "Attach to a server"),
             ("csi gdb [TARGET] [PROCESS]", "Attach to CSI"),
             ("mount gdb [TARGET] [PROCESS]", "Attach to a FUSE mount"),
+            ("heaptrack [TARGET] [PROCESS]", "Profile a server"),
+            ("csi heaptrack [TARGET] [PROCESS]", "Profile CSI"),
+            ("mount heaptrack [TARGET] [PROCESS]", "Profile a FUSE mount"),
             ("delete POD [OPTS]", "Delete a server pod"),
             ("csi delete POD [OPTS]", "Delete a CSI pod"),
             ("mount delete POD [OPTS]", "Delete a mount pod"),
@@ -160,6 +165,8 @@ HELP_SHORTCUTS = (
     ("cfsex", "cfs exec"),
     ("cfsgdb", "cfs gdb"),
     ("cfscsigdb", "cfs csi gdb"),
+    ("cfsht", "cfs heaptrack"),
+    ("cfscsiht", "cfs csi heaptrack"),
     ("cfscurl", "cfs curl"),
     ("cfsdb", "cfs db"),
     ("cfsvk", "cfs valkey"),
@@ -178,6 +185,7 @@ COMMAND_ALIASES = {
     "e": "exec",
     "shell": "exec",
     "g": "gdb",
+    "ht": "heaptrack",
     "del": "delete",
     "d": "delete",
     "rm": "delete",
@@ -193,6 +201,7 @@ HELP_EXAMPLES = (
     ("cfs exec 1", "Shell into server 1"),
     ("cfs csi gdb 2", "Debug CSI pod 2"),
     ("cfs mount gdb 1", "Debug FUSE mount 1"),
+    ("cfs heaptrack 1", "Profile server 1 into the current directory"),
     ("cfs m d 1", "Delete mount pod 1"),
     ("cfs curl /v1/health -i", "Request through the LB"),
     ("cfs oai /v1/health", "Inspect an API route"),
@@ -207,6 +216,7 @@ HELP_ENVIRONMENT = (
     ("CFS_CURL_PORT", "Fixed proxy port"),
     ("CFS_RUNTIME_DIR", "Runtime state directory"),
     ("CFS_GDB_IMAGE", "Debugger image"),
+    ("CFS_HEAPTRACK_IMAGE", "Heap profiler image"),
 )
 
 HELP_TARGETING = (
@@ -214,6 +224,7 @@ HELP_TARGETING = (
     ("TARGET", "camberfs, csi, mount, db, or valkey"),
     ("m l 1", "Short for mount logs 1"),
     ("c g 2", "Short for csi gdb 2"),
+    ("c ht 2", "Short for csi heaptrack 2"),
     ("m d 1", "Short for mount delete 1"),
     ("POD", "Pod number or unique name fragment"),
     ("[OPTS]", "Passed through to kubectl"),
@@ -1568,7 +1579,7 @@ def gdb_rust_log():
     return rust_log
 
 
-def gdb_attach(args, default_kind="server"):
+def attach_target(args, default_kind, command):
     arguments = list(args)
     kind = default_kind
     if arguments and arguments[0] in TARGET_KINDS:
@@ -1583,13 +1594,13 @@ def gdb_attach(args, default_kind="server"):
     }
     process_name = arguments[1] if len(arguments) > 1 else defaults[kind]
     if len(arguments) > 2:
-        raise CfsError("usage: cfs [TARGET] gdb [POD] [PROCESS]")
+        raise CfsError(f"usage: cfs [TARGET] {command} [POD] [PROCESS]")
     item = resolve_pod(kind, target)
-    pod = item["metadata"]["name"]
-    container = preferred_container(item, kind)
-    image = os.environ.get("CFS_GDB_IMAGE", "ubuntu:24.04")
-    rust_log = gdb_rust_log()
-    profile = runtime_directory() / "gdb-profile.json"
+    return kind, item, process_name
+
+
+def attach_profile(name):
+    profile = runtime_directory() / f"{name}-profile.json"
     profile.write_text(
         json.dumps(
             {
@@ -1604,6 +1615,16 @@ def gdb_attach(args, default_kind="server"):
         )
     )
     profile.chmod(0o600)
+    return profile
+
+
+def gdb_attach(args, default_kind="server"):
+    kind, item, process_name = attach_target(args, default_kind, "gdb")
+    pod = item["metadata"]["name"]
+    container = preferred_container(item, kind)
+    image = os.environ.get("CFS_GDB_IMAGE", "ubuntu:24.04")
+    rust_log = gdb_rust_log()
+    profile = attach_profile("gdb")
     script = r'''
 set -e
 if ! command -v gdb >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1; then
@@ -1624,7 +1645,11 @@ if [ -z "$pid" ] || [ ! -d "/proc/$pid" ]; then
   exit 1
 fi
 echo "attaching gdb to $target (pid $pid) in $HOSTNAME"
-exec gdb -p "$pid"
+exec gdb \
+  --init-eval-command="set non-stop on" \
+  --init-eval-command="set mi-async on" \
+  --pid="$pid" \
+  --eval-command="continue&"
 '''.strip()
     return kubectl(
         [
@@ -1644,6 +1669,347 @@ exec gdb -p "$pid"
             process_name,
         ]
     )
+
+
+def heaptrack_container(pod, target, image, profile):
+    image_key = hashlib.sha256(image.encode()).hexdigest()[:8]
+    base_name = f"cfs-heaptrack-{image_key}"
+    ready_path = "/tmp/cfs-heaptrack-ready"
+    item = kubectl_json(["get", "pod", pod])
+    containers = item.get("spec", {}).get("ephemeralContainers", [])
+    statuses = {
+        status["name"]: status
+        for status in item.get("status", {}).get("ephemeralContainerStatuses", [])
+    }
+    cached = [
+        container["name"]
+        for container in containers
+        if re.fullmatch(rf"{base_name}(?:-[0-9]+)?", container["name"])
+    ]
+    active = [
+        name
+        for name in cached
+        if "terminated" not in statuses.get(name, {}).get("state", {})
+    ]
+    created = not active
+    if active:
+        name = active[-1]
+    else:
+        used = set(cached)
+        name = base_name
+        suffix = 2
+        while name in used:
+            name = f"{base_name}-{suffix}"
+            suffix += 1
+        bootstrap = r'''
+set -e
+if ! command -v heaptrack >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1 || ! command -v patchelf >/dev/null 2>&1 || ! command -v gdb >/dev/null 2>&1; then
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "debug image needs heaptrack, procps, patchelf, and gdb" >&2
+    exit 1
+  fi
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq heaptrack procps patchelf gdb
+fi
+touch /tmp/cfs-heaptrack-ready
+exec sleep infinity
+'''.strip()
+        print(f"preparing cached heaptrack container in {pod}", file=sys.stderr)
+        kubectl(
+            [
+                "debug",
+                "--quiet",
+                f"pod/{pod}",
+                f"--target={target}",
+                f"--container={name}",
+                f"--image={image}",
+                "--profile=sysadmin",
+                f"--custom={profile}",
+                "--",
+                "bash",
+                "-lc",
+                bootstrap,
+            ]
+        )
+
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        probe = subprocess.run(
+            kubectl_command(
+                ["exec", f"pod/{pod}", "-c", name, "--", "test", "-f", ready_path]
+            ),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if probe.returncode == 0:
+            if created:
+                print(f"heaptrack tools cached in {pod}/{name}", file=sys.stderr)
+            return name
+        item = kubectl_json(["get", "pod", pod])
+        status = next(
+            (
+                value
+                for value in item.get("status", {}).get("ephemeralContainerStatuses", [])
+                if value["name"] == name
+            ),
+            {},
+        )
+        terminated = status.get("state", {}).get("terminated")
+        if terminated:
+            reason = terminated.get("reason", "terminated")
+            raise CfsError(f"cached heaptrack container {name} {reason.lower()}")
+        time.sleep(1)
+    raise CfsError(f"timed out preparing cached heaptrack container {name}")
+
+
+def heaptrack_attach(args, default_kind="server"):
+    kind, item, process_name = attach_target(args, default_kind, "heaptrack")
+    pod = item["metadata"]["name"]
+    container = preferred_container(item, kind)
+    image = os.environ.get(
+        "CFS_HEAPTRACK_IMAGE",
+        "debian:bookworm-slim",
+    )
+    profile = attach_profile("heaptrack")
+    debug_container = heaptrack_container(pod, container, image, profile)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe_process = re.sub(r"[^A-Za-z0-9_.-]+", "-", process_name).strip("-.")
+    output = Path.cwd() / f"heaptrack.{pod}.{safe_process or 'process'}.{timestamp}.gz"
+    suffix = 1
+    while output.exists():
+        output = output.with_name(f"{output.stem}-{suffix}{output.suffix}")
+        suffix += 1
+    stop_file = f"/tmp/cfs-heaptrack-stop-{os.getpid()}-{time.time_ns()}"
+
+    script = r'''
+set -e
+exec 3>&1
+exec 1>&2
+if ! command -v heaptrack >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1 || ! command -v patchelf >/dev/null 2>&1 || ! command -v gdb >/dev/null 2>&1; then
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "debug image needs heaptrack, procps, patchelf, and gdb" >&2
+    exit 1
+  fi
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq heaptrack procps patchelf gdb
+fi
+target=$1
+stop_file=$2
+case "$target" in
+  *[!0-9]*) pid=$(pgrep -o -x "$target" || pgrep -o -f "$target" || true) ;;
+  *) pid=$target ;;
+esac
+if [ -z "$pid" ] || [ ! -d "/proc/$pid" ]; then
+  echo "process not found: $target" >&2
+  exit 1
+fi
+lock_dir=/tmp/cfs-heaptrack-lock
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  echo "another heaptrack profile is running in this pod" >&2
+  exit 1
+fi
+target_dir="/proc/$pid/root/tmp/cfs-heaptrack-$$"
+gdb_wrapper_dir=/tmp/cfs-heaptrack-gdb
+tracker_file=/tmp/cfs-heaptrack-tracker.pid
+target_file=/tmp/cfs-heaptrack-target.pid
+module_links=/tmp/cfs-heaptrack-module-links-$$
+trap 'rm -rf "$target_dir" "$gdb_wrapper_dir"; while IFS= read -r link; do rm -f "$link"; done < "$module_links"; rm -f "$module_links" "$stop_file" "$tracker_file" "$target_file"; rmdir "$lock_dir"' EXIT
+touch "$module_links"
+awk '$6 ~ /^\// { sub(/ \(deleted\)$/, "", $6); print $6 }' "/proc/$pid/maps" | sort -u | while IFS= read -r module; do
+  target_module="/proc/$pid/root$module"
+  if [ -f "$target_module" ] && [ ! -e "$module" ] && [ ! -L "$module" ]; then
+    mkdir -p "$(dirname "$module")"
+    ln -s "$target_module" "$module"
+    printf '%s\n' "$module" >> "$module_links"
+  fi
+done
+source_inject=$(find /usr/lib -path '*/heaptrack/libheaptrack_inject.so' -print -quit)
+if [ -z "$source_inject" ]; then
+  echo "cannot find libheaptrack_inject.so" >&2
+  exit 1
+fi
+target_inject="$target_dir/libheaptrack_inject.so"
+mkdir -p "$target_dir"
+cp -L "$source_inject" "$target_inject"
+ldd "$source_inject" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }' | while read -r dependency; do
+  cp -L "$dependency" "$target_dir/"
+done
+patchelf --set-rpath '$ORIGIN' "$target_inject"
+heaptrack_bin=$(command -v heaptrack)
+sed -i \
+  -e '/ptrace_scope.*-gt "0"/s/.*/            if false; then/' \
+  -e 's|stat -c %U|stat -c %u|' \
+  -e "s|^LIBHEAPTRACK_INJECT=.*libheaptrack_inject.so.*|LIBHEAPTRACK_INJECT=\"$target_inject\"|" \
+  -e 's|^LIBHEAPTRACK_INJECT=$(readlink -f "$LIBHEAPTRACK_INJECT")$|:|' \
+  -e "s|^pipe=.*heaptrack_fifo.*|pipe=$target_dir/heaptrack_fifo|" \
+  "$heaptrack_bin"
+if ! grep -Fq 'if [ "$EXIT_CODE" -ne 0 ]; then exit "$EXIT_CODE"; fi' "$heaptrack_bin"; then
+  sed -i '/^[[:space:]]*EXIT_CODE=$?$/a\    if [ "$EXIT_CODE" -ne 0 ]; then exit "$EXIT_CODE"; fi' "$heaptrack_bin"
+fi
+real_gdb=$(command -v gdb)
+mkdir -p "$gdb_wrapper_dir"
+cat > "$gdb_wrapper_dir/gdb" <<'EOF'
+#!/bin/bash
+stdout=$(mktemp)
+stderr=$(mktemp)
+"$CFS_REAL_GDB" "$@" >"$stdout" 2>"$stderr"
+status=$?
+cat "$stdout"
+cat "$stderr" >&2
+if grep -Eq 'No symbol "heaptrack_(inject|stop)"' "$stdout" "$stderr"; then
+  status=1
+fi
+rm -f "$stdout" "$stderr"
+exit "$status"
+EOF
+chmod +x "$gdb_wrapper_dir/gdb"
+remote_output=/tmp/cfs-heaptrack
+rm -f "$remote_output.gz" "$remote_output.zst"
+echo "attaching heaptrack to $target (pid $pid) in $HOSTNAME" >&2
+CFS_REAL_GDB="$real_gdb" PATH="$gdb_wrapper_dir:$PATH" heaptrack --output "$remote_output" --pid "$pid" </dev/null >&2 &
+tracker=$!
+printf '%s\n' "$tracker" > "$tracker_file"
+printf '%s\n' "$pid" > "$target_file"
+while kill -0 "$tracker" 2>/dev/null && [ ! -f "$stop_file" ]; do
+  sleep 0.2
+done
+if kill -0 "$tracker" 2>/dev/null; then
+  kill -TERM "$tracker" 2>/dev/null || true
+fi
+tracker_status=0
+wait "$tracker" || tracker_status=$?
+if [ "$tracker_status" -ne 0 ] && [ "$tracker_status" -ne 143 ]; then
+  echo "heaptrack failed with status $tracker_status" >&2
+  exit "$tracker_status"
+fi
+if [ -f "$remote_output.gz" ]; then
+  cat "$remote_output.gz" >&3
+elif [ -f "$remote_output.zst" ]; then
+  zstd -dc "$remote_output.zst" | gzip -c >&3
+else
+  echo "heaptrack did not produce a trace" >&2
+  exit 1
+fi
+'''.strip()
+    command = kubectl_command(
+        [
+            "exec",
+            f"pod/{pod}",
+            "-c",
+            debug_container,
+            "--",
+            "bash",
+            "-lc",
+            script,
+            "cfs-heaptrack",
+            process_name,
+            stop_file,
+        ]
+    )
+    stop_command = kubectl_command(
+        [
+            "exec",
+            f"pod/{pod}",
+            "-c",
+            debug_container,
+            "--",
+            "touch",
+            stop_file,
+        ]
+    )
+    force_script = r'''
+if [ -s /tmp/cfs-heaptrack-target.pid ]; then
+  target=$(cat /tmp/cfs-heaptrack-target.pid)
+  timeout 5 gdb --batch-silent -n -iex="set auto-solib-add off" \
+    -iex="set language c" -p "$target" \
+    --eval-command="sharedlibrary libheaptrack_inject" \
+    --eval-command="call (void) heaptrack_stop()" \
+    --eval-command="detach" || true
+fi
+if [ -s /tmp/cfs-heaptrack-tracker.pid ]; then
+  tracker=$(cat /tmp/cfs-heaptrack-tracker.pid)
+  pkill -KILL -P "$tracker" 2>/dev/null || true
+  kill -KILL "$tracker" 2>/dev/null || true
+fi
+'''.strip()
+    force_command = kubectl_command(
+        [
+            "exec",
+            f"pod/{pod}",
+            "-c",
+            debug_container,
+            "--",
+            "bash",
+            "-lc",
+            force_script,
+        ]
+    )
+    print(f"heaptrack output: {output}", file=sys.stderr)
+    with output.open("xb") as output_file:
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=output_file,
+                start_new_session=True,
+            )
+            stop_requested = False
+            print(
+                "profiling; press Enter or Ctrl+C to stop and save the trace",
+                file=sys.stderr,
+            )
+            try:
+                while process.poll() is None:
+                    readable, _, _ = select.select([sys.stdin], [], [], 0.25)
+                    if readable:
+                        sys.stdin.readline()
+                        stop_requested = True
+                        break
+            except KeyboardInterrupt:
+                print(file=sys.stderr)
+                stop_requested = True
+            if stop_requested and process.poll() is None:
+                subprocess.run(stop_command, check=False)
+            cleanup_deadline = time.monotonic() + 20
+            while process.poll() is None and time.monotonic() < cleanup_deadline:
+                try:
+                    process.wait(timeout=1)
+                except KeyboardInterrupt:
+                    print("waiting for heaptrack to finish", file=sys.stderr)
+                except subprocess.TimeoutExpired:
+                    pass
+            if process.poll() is None:
+                print("heaptrack cleanup timed out; forcing stop", file=sys.stderr)
+                subprocess.run(force_command, check=False)
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+            returncode = process.returncode
+        except BaseException:
+            if "process" in locals() and process.poll() is None:
+                subprocess.run(stop_command, check=False)
+                try:
+                    process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    process.terminate()
+            output.unlink(missing_ok=True)
+            raise
+    if returncode:
+        output.unlink(missing_ok=True)
+        return returncode
+    with output.open("rb") as output_file:
+        magic = output_file.read(2)
+    if magic != b"\x1f\x8b":
+        output.unlink()
+        raise CfsError("heaptrack produced an invalid trace")
+    print(f"saved heaptrack trace to {output}")
+    return 0
 
 
 def db(args):
@@ -1823,6 +2189,8 @@ def run_target_command(kind, command, args):
         return exec_in(kind, args)
     if command == "gdb":
         return gdb_attach(args, kind)
+    if command == "heaptrack":
+        return heaptrack_attach(args, kind)
     if command == "delete":
         return delete_pod(kind, args)
     target = "camberfs" if kind == "server" else kind
@@ -1840,6 +2208,7 @@ def target_invocation(argv):
         "logs",
         "exec",
         "gdb",
+        "heaptrack",
         "delete",
     ):
         return None
@@ -1878,8 +2247,10 @@ def main(argv):
         "valkey-logs": lambda: logs("valkey", args),
         "exec": lambda: exec_in("server", args),
         "gdb": lambda: gdb_attach(args),
+        "heaptrack": lambda: heaptrack_attach(args),
         "delete": lambda: delete_pod("server", args),
         "csi-gdb": lambda: gdb_attach(args, "csi"),
+        "csi-heaptrack": lambda: heaptrack_attach(args, "csi"),
         "csi-exec": lambda: exec_in("csi", args),
         "db-shell": lambda: exec_in("db", args),
         "valkey-shell": lambda: exec_in("valkey", args),
