@@ -21,3 +21,6 @@ alias src="source ~/.bashrc"
 alias la="ls -la"
 alias lg="lazygit"
 alias k9="kill -9"
+
+# Universal unix locations
+alias cdp="cp ~/.agents/prompts/"
