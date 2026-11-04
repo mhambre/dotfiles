@@ -7,6 +7,7 @@
 : "${DEVU_NODE_MANIFEST:=}"  # defaults to package.json beside the installed dotfiles
 : "${DEVU_SHARED_AGENT_CONFIG:=$HOME/.agents}"
 : "${DEVU_NODE_VERSION:=v24.22.2}"  # used when the container has no node/npm
+: "${DEVU_NPM_ALLOW_SCRIPTS:=@anthropic-ai/claude-code,tree-sitter-cli}"
 : "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
 : "${DEVU_GIT_CRED_HOSTS:=github.com gitlab.tools.basedweights.com huggingface.co}"  # https hosts whose creds get exported from the host credential helper
@@ -430,7 +431,7 @@ _devu_bootstrap() {
             devcontainer exec --workspace-folder "$ws" sh -c "
                 export PATH='$home/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:'\"\$PATH\"
                 npm config set prefix '$home/.local' >/dev/null 2>&1 || true
-                npm install -g$need
+                npm install -g --allow-scripts='$DEVU_NPM_ALLOW_SCRIPTS'$need
             " || echo "devu:   npm install failed — re-run 'devu' to retry"
         fi
     else
