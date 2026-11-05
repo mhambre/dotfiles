@@ -8,9 +8,11 @@
 : "${DEVU_SHARED_AGENT_CONFIG:=$HOME/.agents}"
 : "${DEVU_NODE_VERSION:=v24.22.2}"  # used when the container has no node/npm
 : "${DEVU_NPM_ALLOW_SCRIPTS:=@anthropic-ai/claude-code,tree-sitter-cli}"
-: "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go}"  # apt names; skipped if no sudo/apt. gcc: compiles treesitter parsers; golang-go: Mason needs go for gopls
+: "${DEVU_SYSTEM_DEPS:=unzip python3 python3-pip python3-venv ripgrep tmux bat fzf gcc golang-go gnupg}"  # apt names; skipped if no sudo/apt
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
 : "${DEVU_GIT_CRED_HOSTS:=github.com gitlab.tools.basedweights.com huggingface.co}"  # https hosts whose creds get exported from the host credential helper
+: "${DEVU_GPG_FORWARD:=1}"
+: "${DEVU_GPG_AGENT_SOCKET:=/tmp/devu-gpg-agent}"
 
 _devu_npm_globals() {
     local manifest="$DEVU_NODE_MANIFEST"
@@ -68,6 +70,99 @@ _devu_container_id() {
 
 _devu_remote_user() {
     devcontainer exec --workspace-folder "${1:-$PWD}" sh -c 'printf %s "${USER:-$(id -un)}"' 2>/dev/null
+}
+
+_devu_gpg_extra_socket() {
+    [ "$DEVU_GPG_FORWARD" != 0 ] || return 1
+    command -v gpgconf >/dev/null 2>&1 || return 1
+    gpgconf --launch gpg-agent >/dev/null 2>&1 || return 1
+
+    local socket
+    socket="$(gpgconf --list-dirs agent-extra-socket 2>/dev/null)"
+    [ -S "$socket" ] || return 1
+    printf '%s\n' "$socket"
+}
+
+_devu_up() {
+    local ws="$1"
+    shift
+    local -a args=(up --workspace-folder "$ws")
+    local gpg_socket
+
+    if [ "$DEVU_GPG_FORWARD" != 0 ]; then
+        if gpg_socket="$(_devu_gpg_extra_socket)"; then
+            args+=(--mount "type=bind,source=$gpg_socket,target=$DEVU_GPG_AGENT_SOCKET")
+        else
+            echo "devu: GPG agent extra socket is unavailable" >&2
+            echo "devu: set DEVU_GPG_FORWARD=0 to start without GPG forwarding" >&2
+            return 1
+        fi
+    fi
+
+    devcontainer "${args[@]}" "$@"
+}
+
+_devu_setup_gpg() {
+    local ws="$1" cid="$2" user="$3" home="$4"
+    local signing_format signing_key export_key pubkey container_pubkey
+
+    [ "$DEVU_GPG_FORWARD" != 0 ] || return 0
+    command -v gpg >/dev/null 2>&1 || {
+        echo "devu: host gpg is required for GPG forwarding" >&2
+        return 1
+    }
+    if ! docker exec "$cid" test -S "$DEVU_GPG_AGENT_SOCKET" 2>/dev/null; then
+        echo "devu: GPG agent socket is not mounted; run devr to recreate the container" >&2
+        return 1
+    fi
+
+    signing_format="$(git -C "$ws" config --get gpg.format 2>/dev/null || true)"
+    [ -z "$signing_format" ] || [ "$signing_format" = openpgp ] || return 0
+    signing_key="$(git -C "$ws" config --get user.signingkey 2>/dev/null || true)"
+    if [ -z "$signing_key" ]; then
+        echo "devu: user.signingkey is not configured" >&2
+        return 1
+    fi
+    export_key="${signing_key%!}"
+    pubkey="$(mktemp)" || return 1
+    if ! gpg --batch --yes --output "$pubkey" --export "$export_key" || [ ! -s "$pubkey" ]; then
+        rm -f "$pubkey"
+        echo "devu: could not export public key $export_key" >&2
+        return 1
+    fi
+    chmod 644 "$pubkey"
+
+    container_pubkey="/tmp/devu-gpg-public-key.$$"
+    if ! docker cp "$pubkey" "$cid:$container_pubkey" >/dev/null; then
+        rm -f "$pubkey"
+        echo "devu: could not copy the GPG public key into the container" >&2
+        return 1
+    fi
+    rm -f "$pubkey"
+
+    echo "devu:   forwarding GPG signing agent"
+    devcontainer exec --workspace-folder "$ws" sh -c '
+        set -e
+        home=$1
+        forwarded_socket=$2
+        public_key=$3
+        user=$4
+
+        mkdir -p "$home/.gnupg"
+        chmod 700 "$home/.gnupg"
+        agent_socket=$(gpgconf --list-dirs agent-socket)
+        mkdir -p "$(dirname "$agent_socket")"
+        rm -f "$agent_socket"
+        ln -s "$forwarded_socket" "$agent_socket"
+        gpg --batch --import "$public_key" >/dev/null 2>&1
+        rm -f "$public_key"
+        chown -R "$user" "$home/.gnupg" 2>/dev/null || true
+        gpg-connect-agent /bye >/dev/null
+    ' sh "$home" "$DEVU_GPG_AGENT_SOCKET" "$container_pubkey" "$user" || {
+        docker exec "$cid" rm -f "$container_pubkey" >/dev/null 2>&1 || true
+        echo "devu: GPG agent setup failed" >&2
+        return 1
+    }
 }
 
 # Copy a host file/dir into the container at the given dest, then chown to remote user.
@@ -260,6 +355,7 @@ _devu_bootstrap() {
             python3-venv) check="python3 -c 'import ensurepip'" ;;
             ripgrep) check="command -v rg" ;;
             golang-go) check="command -v go" ;;
+            gnupg) check="command -v gpg" ;;
             bat) check="command -v bat || command -v batcat" ;;  # Debian ships bat as 'batcat'
             *) check="command -v $pkg" ;;
         esac
@@ -281,6 +377,8 @@ _devu_bootstrap() {
             fi
         " || echo "devu:   system deps install failed (Mason packages may not install)"
     fi
+
+    _devu_setup_gpg "$ws" "$cid" "$user" "$home" || return $?
 
     # ---------- bat symlink (Debian ships /usr/bin/batcat) ----------
     devcontainer exec --workspace-folder "$ws" sh -c "
@@ -457,7 +555,7 @@ _devu_bootstrap() {
 # Builds/starts the devcontainer for the current workspace.
 devu() {
     local ws="${1:-$PWD}"
-    devcontainer up --workspace-folder "$ws" || return $?
+    _devu_up "$ws" || return $?
     _devu_bootstrap "$ws" || return $?
     devi "$ws"
 }
@@ -485,7 +583,7 @@ devi() {
 devr() {
     # Rebuild the devcontainer from scratch and re-bootstrap.
     local ws="${1:-$PWD}"
-    devcontainer up --workspace-folder "$ws" --remove-existing-container || return $?
+    _devu_up "$ws" --remove-existing-container || return $?
     _devu_bootstrap "$ws" || return $?
     devi "$ws"
 }
