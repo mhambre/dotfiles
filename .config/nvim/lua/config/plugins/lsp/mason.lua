@@ -55,7 +55,7 @@ return {
 				"pylint",
 				"eslint_d",
 				"shellcheck", -- bashls delegates diagnostics to shellcheck
-				"tree-sitter-cli", -- kulala needs >= 0.21 to build its http parser
+				"tree-sitter-cli",
 			},
 		})
 	end,

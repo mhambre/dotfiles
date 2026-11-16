@@ -10,7 +10,7 @@ local ensure_installed = {
   "html",
   "css",
   "graphql",
-  "http", -- kulala
+  "http",
   "prisma",
   "rust",
   "go",
