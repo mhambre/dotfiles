@@ -12,7 +12,10 @@
 : "${DEVU_BASHRC_D_EXCLUDE:=devcontainer-aliases.sh}"  # space-separated filenames in ~/.bashrc.d/ to skip
 : "${DEVU_GIT_CRED_HOSTS:=github.com gitlab.tools.basedweights.com huggingface.co}"  # https hosts whose creds get exported from the host credential helper
 : "${DEVU_GPG_FORWARD:=1}"
-: "${DEVU_GPG_AGENT_SOCKET:=/tmp/devu-gpg-agent}"
+if [ "${DEVU_GPG_AGENT_SOCKET:-}" = /tmp/devu-gpg-agent ]; then
+    unset DEVU_GPG_AGENT_SOCKET
+fi
+: "${DEVU_GPG_AGENT_SOCKET:=/run/devu-gpg-agent}"
 
 _devu_npm_globals() {
     local manifest="$DEVU_NODE_MANIFEST"
@@ -104,7 +107,7 @@ _devu_up() {
 
 _devu_setup_gpg() {
     local ws="$1" cid="$2" user="$3" home="$4"
-    local signing_format signing_key export_key pubkey container_pubkey
+    local signing_format signing_key export_key pubkey
 
     [ "$DEVU_GPG_FORWARD" != 0 ] || return 0
     command -v gpg >/dev/null 2>&1 || {
@@ -130,23 +133,11 @@ _devu_setup_gpg() {
         echo "devu: could not export public key $export_key" >&2
         return 1
     fi
-    chmod 644 "$pubkey"
-
-    container_pubkey="/tmp/devu-gpg-public-key.$$"
-    if ! docker cp "$pubkey" "$cid:$container_pubkey" >/dev/null; then
-        rm -f "$pubkey"
-        echo "devu: could not copy the GPG public key into the container" >&2
-        return 1
-    fi
-    rm -f "$pubkey"
-
     echo "devu:   forwarding GPG signing agent"
-    devcontainer exec --workspace-folder "$ws" sh -c '
+    docker exec -i -u "$user" "$cid" sh -c '
         set -e
         home=$1
         forwarded_socket=$2
-        public_key=$3
-        user=$4
 
         mkdir -p "$home/.gnupg"
         chmod 700 "$home/.gnupg"
@@ -154,15 +145,14 @@ _devu_setup_gpg() {
         mkdir -p "$(dirname "$agent_socket")"
         rm -f "$agent_socket"
         ln -s "$forwarded_socket" "$agent_socket"
-        gpg --batch --import "$public_key" >/dev/null 2>&1
-        rm -f "$public_key"
-        chown -R "$user" "$home/.gnupg" 2>/dev/null || true
+        gpg --batch --import >/dev/null
         gpg-connect-agent /bye >/dev/null
-    ' sh "$home" "$DEVU_GPG_AGENT_SOCKET" "$container_pubkey" "$user" || {
-        docker exec "$cid" rm -f "$container_pubkey" >/dev/null 2>&1 || true
+    ' sh "$home" "$DEVU_GPG_AGENT_SOCKET" < "$pubkey" || {
+        rm -f "$pubkey"
         echo "devu: GPG agent setup failed" >&2
         return 1
     }
+    rm -f "$pubkey"
 }
 
 # Copy a host file/dir into the container at the given dest, then chown to remote user.
