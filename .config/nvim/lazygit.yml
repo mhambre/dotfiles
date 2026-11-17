@@ -1,0 +1,9 @@
+os:
+  editPreset: nvim-remote
+  edit: >-
+    nvim --server "$NVIM" --remote-expr 'execute("LazyGitHide")' &&
+    nvim --server "$NVIM" --remote {{filename}}
+  editAtLine: >-
+    nvim --server "$NVIM" --remote-expr 'execute("LazyGitHide")' &&
+    nvim --server "$NVIM" --remote {{filename}} &&
+    nvim --server "$NVIM" --remote-expr 'cursor({{line}}, 1)'
