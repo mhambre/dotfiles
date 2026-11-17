@@ -1,11 +1,24 @@
+local function review_store_path()
+	local dir = vim.fn.expand("%:p:h")
+	if dir == "" then
+		dir = vim.fn.getcwd()
+	end
+
+	local result = vim.system({ "git", "-C", dir, "rev-parse", "--absolute-git-dir" }, { text = true }):wait()
+	if result.code == 0 and result.stdout ~= "" then
+		return vim.fs.joinpath(vim.trim(result.stdout), "meow-review", "annotations.json")
+	end
+
+	return ".cache/meow-review/annotations.json"
+end
+
 return {
 	"retran/meow.review.nvim",
 	dependencies = { "MunifTanjim/nui.nvim" },
 	event = "VeryLazy",
 	config = function()
 		require("meow.review").setup({
-			-- keep annotations out of the worktree, .git is per repo and never committed
-			store_path = ".git/meow-review/annotations.json",
+			store_path = review_store_path(),
 			auto_gitignore = false,
 			annotation_types = {
 				ISSUE = { icon = "\u{f188}" },
