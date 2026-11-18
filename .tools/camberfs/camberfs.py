@@ -146,7 +146,7 @@ HELP_SECTIONS = (
     (
         "Clients",
         (
-            ("curl [PATH] [OPTS]", "Cached Service proxy"),
+            ("curl [PATH] [OPTS]", "Request CamberFS over HTTP"),
             ("curl-status", "Show proxy connection"),
             ("curl-stop", "Stop proxy connection"),
             ("db [PSQL_ARGS]", "psql client"),
@@ -213,6 +213,7 @@ HELP_ENVIRONMENT = (
     ("CFS_REPO", "CamberFS Git checkout"),
     ("CFS_NAMESPACE", "Namespace override"),
     ("CFS_KUBECTL", "kubectl executable"),
+    ("CFS_CURL", "Base URL override for cfs curl"),
     ("CFS_CURL_PORT", "Fixed proxy port"),
     ("CFS_RUNTIME_DIR", "Runtime state directory"),
     ("CFS_GDB_IMAGE", "Debugger image"),
@@ -1550,10 +1551,13 @@ def proxy_status():
 def curl_service(args):
     path = "/v1/health"
     options = list(args)
+    server = os.environ.get("CFS_CURL")
     if options and not options[0].startswith("-"):
         path = options.pop(0)
     if path.startswith("http://") or path.startswith("https://"):
         url = path
+    elif server:
+        url = f"{server.rstrip('/')}/{path.lstrip('/')}"
     else:
         state = start_proxy()
         proxy_path = (
