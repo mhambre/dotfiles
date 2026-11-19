@@ -24,7 +24,10 @@ return {
 			},
 		},
 		keys = {
-			{ "<leader>rh", "<cmd>botright vertical Rest run<CR>", desc = "Run HTTP request" },
+			{ "<leader>rh", "<cmd>botright vertical Rest run<CR>", ft = "http", desc = "Run HTTP request" },
 		},
+		config = function()
+			require("config.rest-response").setup()
+		end,
 	},
 }
