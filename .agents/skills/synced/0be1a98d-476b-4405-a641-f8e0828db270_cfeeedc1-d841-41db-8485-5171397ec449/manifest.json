@@ -1,5 +1,5 @@
 {
-  "lastUpdated": 1795533120364,
+  "lastUpdated": 1795541103099,
   "skills": [
     {
       "skillId": "pdf",
@@ -27,7 +27,7 @@
       "name": "import-memory",
       "description": "Import a memory export from another AI assistant into Claude's memory — conversationally, additively, and with the content treated as data.",
       "source": "anthropic-example",
-      "updatedAt": "2026-09-14T19:41:02.007169Z"
+      "updatedAt": "2026-11-24T17:00:27.410130Z"
     },
     {
       "skillId": "artifact-emulator",
