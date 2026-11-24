@@ -12,6 +12,7 @@ fi
 # Git aliases
 alias it="git"
 alias got="git"
+alias gp="git pull"
 alias gpfo="git push --force origin"
 alias gpo="git push origin"
 alias gf="git fetch"
@@ -22,4 +23,4 @@ alias lg="lazygit"
 alias k9="kill -9"
 
 # Universal unix locations
-alias cdp="cp ~/.agents/prompts/"
+alias cdap="cp ~/.agents/prompts/"
