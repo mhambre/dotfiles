@@ -1,13 +1,11 @@
 # Code review
 
-Invoke `code-review` with the Skill tool and the exact arguments
-`max --max-findings all`. Use the default local diff target. Keep this stage
-read-only. Wait for the review's completed report if the skill starts a
-child agent.
+Review the requested local changes for correctness issues and regressions.
+Include staged changes, unstaged changes, and relevant untracked source
+files. Use the optional comment as review guidance. Keep this stage
+read-only. Use static inspection for any security issues and omit exploit
+code, payloads, and reproduction steps.
 
-Use the optional comment as review guidance. Check relevant untracked
-source files if the built-in review misses them. Verify findings against the
-current code and report every substantiated finding with a file and line,
-impact, evidence, and proposed fix. If the built-in review fails, report the
-blocker and label any findings from your supplementary inspection accordingly.
-If it succeeds with no findings, say so.
+Verify findings against the current code. Report every substantiated
+finding with a file and line, impact, evidence, and proposed fix. If you
+find no issues, say so. Report any part of the review you could not complete.
