@@ -1,0 +1,5 @@
+{
+  "name": "review-factory",
+  "version": "1.0.0",
+  "description": "Run independent security and code reviews and reconcile their findings locally."
+}
